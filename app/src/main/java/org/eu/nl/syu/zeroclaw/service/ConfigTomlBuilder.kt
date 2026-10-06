@@ -516,10 +516,15 @@ object ConfigTomlBuilder {
      * keep the TOML output minimal.
      *
      * @param config Aggregated global configuration values.
+     * @param encryptSecret Optional encryptor applied to secret values
+     *   (`api_key`, tokens) before emission. When null, values are written as-is.
      * @return A valid TOML configuration string.
      */
     @Suppress("CognitiveComplexMethod", "LongMethod")
-    fun build(config: GlobalTomlConfig): String =
+    fun build(
+        config: GlobalTomlConfig,
+        encryptSecret: ((String) -> String)? = null,
+    ): String =
         buildString {
             appendLine("default_temperature = ${config.temperature}")
 
@@ -537,7 +542,7 @@ object ConfigTomlBuilder {
                     if (needsPlaceholderKey(resolvedProvider)) PLACEHOLDER_API_KEY else ""
                 }
             if (effectiveKey.isNotBlank()) {
-                appendLine("api_key = ${tomlString(effectiveKey)}")
+                appendLine("api_key = ${tomlString(protect(effectiveKey, encryptSecret))}")
             }
 
             if (config.compactContext) {
@@ -567,6 +572,7 @@ object ConfigTomlBuilder {
 
             appendReliabilitySection(config)
             appendAutonomySection(config)
+            appendRiskProfileSection(config)
             appendTunnelSection(config)
             appendSchedulerSection(config)
             appendHeartbeatSection(config)
@@ -738,6 +744,45 @@ object ConfigTomlBuilder {
         appendLine("max_cost_per_day_cents = ${config.maxCostPerDayCents.coerceAtLeast(0)}")
         appendLine("require_approval_for_medium_risk = ${config.requireApprovalMediumRisk}")
         appendLine("block_high_risk_commands = ${config.blockHighRiskCommands}")
+    }
+
+    /**
+     * Appends the v0.8.x `[risk_profiles.default]` policy section.
+     *
+     * Upstream moved the autonomous-policy fields off the legacy `[autonomy]`
+     * table onto named `[risk_profiles.<alias>]` entries, and agents resolve
+     * their guardrails through `risk_profile = "<alias>"`. Without a
+     * `default` profile the engine's channels component fails to start
+     * ("does not name a configured risk_profiles entry"). Mirrors the values
+     * emitted for legacy `[autonomy]` so behavior is unchanged.
+     *
+     * @param config Configuration to read policy values from.
+     */
+    private fun StringBuilder.appendRiskProfileSection(config: GlobalTomlConfig) {
+        appendLine()
+        appendLine("[risk_profiles.default]")
+        appendLine("level = ${tomlString(config.autonomyLevel)}")
+        appendLine("workspace_only = ${config.workspaceOnly}")
+        appendList("allowed_commands", config.allowedCommands)
+        appendList("forbidden_paths", config.forbiddenPaths)
+        appendLine(
+            "require_approval_for_medium_risk = ${config.requireApprovalMediumRisk}",
+        )
+        appendLine("block_high_risk_commands = ${config.blockHighRiskCommands}")
+    }
+
+    /** Appends a TOML string-array field. */
+    private fun StringBuilder.appendList(
+        key: String,
+        values: List<String>,
+    ) {
+        val items =
+            if (values.isEmpty()) {
+                "[]"
+            } else {
+                "[${values.joinToString(", ") { tomlString(it) }}]"
+            }
+        appendLine("$key = $items")
     }
 
     /**
@@ -1308,10 +1353,13 @@ object ConfigTomlBuilder {
      * uses the gateway bridge for direct messaging instead of stdin/stdout.
      *
      * @param channelsWithSecrets List of pairs: (channel, all config values including secrets).
+     * @param encryptSecret Optional encryptor applied to fields flagged as
+     *   secret (`bot_token`, passwords, …) before emission.
      * @return TOML string for the channels section, or empty if no channels.
      */
     fun buildChannelsToml(
         channelsWithSecrets: List<Pair<ConnectedChannel, Map<String, String>>>,
+        encryptSecret: ((String) -> String)? = null,
     ): String {
         if (channelsWithSecrets.isEmpty()) return ""
         return buildString {
@@ -1330,7 +1378,9 @@ object ConfigTomlBuilder {
                     if (spec.key == "guild_id" || spec.key == "channel_id") continue
                     val value = folded[spec.key].orEmpty()
                     if (value.isBlank() && !spec.isRequired) continue
-                    appendTomlField(spec.key, value, spec.inputType)
+                    val emittedValue =
+                        if (spec.isSecret) protect(value, encryptSecret) else value
+                    appendTomlField(spec.key, emittedValue, spec.inputType)
                     emitted += spec.key
                 }
                 // Folded plural keys on types whose spec only declares the
@@ -1346,9 +1396,56 @@ object ConfigTomlBuilder {
                     appendLine("draft_update_interval_ms = 1000")
                     appendLine("interrupt_on_new_message = true")
                 }
+                if (channel.type == ChannelType.DISCORD) {
+                    // Register application (slash) commands per configured guild.
+                    appendLine("slash_commands = true")
+                }
+                appendPeerGroup(channel, folded)
             }
         }
     }
+
+    /**
+     * Appends a `[peer_groups.<type>_<alias>]` allowlist for a channel.
+     *
+     * Upstream v0.8.x ignores the legacy per-channel `allowed_users` field and
+     * authorizes inbound external senders through
+     * `peer_groups.<type>_<alias>.external_peers`. Without this group the engine
+     * drops every inbound message with "ignoring message from unauthorized
+     * user". Only emitted when the channel lists allowed users.
+     *
+     * @param channel Channel being serialized.
+     * @param values Folded channel values (including `allowed_users`).
+     */
+    private fun StringBuilder.appendPeerGroup(
+        channel: ConnectedChannel,
+        values: Map<String, String>,
+    ) {
+        val peers =
+            values["allowed_users"].orEmpty()
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+        if (peers.isEmpty()) return
+        val key = channel.type.tomlKey
+        val list = peers.joinToString(", ") { tomlString(it) }
+        appendLine()
+        appendLine("[peer_groups.${tomlKey("${key}_$key")}]")
+        appendLine("channel = ${tomlString("$key.$key")}")
+        appendLine("external_peers = [$list]")
+    }
+
+    /**
+     * Applies the secret encryptor when present, leaving the value untouched
+     * otherwise. Blank values pass through unchanged.
+     *
+     * @param value Value to protect.
+     * @param encryptSecret Encryptor, or null to write the value as-is.
+     */
+    private fun protect(
+        value: String,
+        encryptSecret: ((String) -> String)?,
+    ): String = if (encryptSecret != null && value.isNotBlank()) encryptSecret(value) else value
 
     /**
      * Folds legacy singular channel keys into their plural list forms.
@@ -1385,37 +1482,159 @@ object ConfigTomlBuilder {
      * fields are emitted.
      *
      * @param agents Resolved agent entries to serialize.
+     * @param channels Channel references (`<type>.<alias>`) to bind to the
+     *   primary (first) agent, so the engine's channel supervisor actually
+     *   starts the listeners. Upstream reports an unbound channel as
+     *   `inactive`/`missing` and never starts it.
+     * @param encryptSecret Optional encryptor applied to each agent's
+     *   `api_key` before emission.
      * @return TOML string with one `[agents.<name>]` section per entry,
      *   or empty if [agents] is empty.
      */
     @Suppress("CognitiveComplexMethod")
-    fun buildAgentsToml(agents: List<AgentTomlEntry>): String {
+    fun buildAgentsToml(
+        agents: List<AgentTomlEntry>,
+        channels: List<String> = emptyList(),
+        encryptSecret: ((String) -> String)? = null,
+    ): String {
         if (agents.isEmpty()) return ""
+        val protectedAgents =
+            if (encryptSecret == null) {
+                agents
+            } else {
+                agents.map { it.copy(apiKey = protect(it.apiKey, encryptSecret)) }
+            }
         return buildString {
-            for (entry in agents) {
-                appendLine()
-                appendLine("[agents.${tomlKey(entry.name)}]")
-                appendLine("provider = ${tomlString(entry.provider)}")
-                appendLine("model = ${tomlString(entry.model)}")
-                if (entry.systemPrompt.isNotBlank()) {
-                    appendLine("system_prompt = ${tomlString(entry.systemPrompt)}")
-                }
-                val effectiveKey =
-                    entry.apiKey.ifBlank {
-                        if (needsPlaceholderKey(entry.provider)) PLACEHOLDER_API_KEY else ""
-                    }
-                if (effectiveKey.isNotBlank()) {
-                    appendLine("api_key = ${tomlString(effectiveKey)}")
-                }
-                if (entry.temperature != null) {
-                    appendLine("temperature = ${entry.temperature}")
-                }
-                if (entry.maxDepth != Agent.DEFAULT_MAX_DEPTH) {
-                    appendLine("max_depth = ${entry.maxDepth.coerceAtLeast(0)}")
-                }
+            for (entry in protectedAgents) {
+                appendProviderModelSection(entry)
+            }
+            for ((index, entry) in protectedAgents.withIndex()) {
+                appendAgentSection(entry, bindChannels = index == 0, channels = channels)
             }
         }
     }
+
+    /**
+     * Appends a `[providers.models.<type>.<alias>]` section for an agent.
+     *
+     * Upstream v0.8.x resolves an agent's model through a dotted
+     * `model_provider` reference into `providers.models`, not through the legacy
+     * inline `provider`/`model` fields. Without this section the channels
+     * supervisor reports "no model configured" and never starts listeners.
+     *
+     * @param entry The agent whose provider should be materialized.
+     */
+    private fun StringBuilder.appendProviderModelSection(entry: AgentTomlEntry) {
+        val (type, uri) = resolveProviderType(entry.provider)
+        if (type.isBlank()) return
+        val alias = agentAlias(entry.name)
+        appendLine()
+        appendLine("[providers.models.${tomlKey(type)}.${tomlKey(alias)}]")
+        if (entry.model.isNotBlank()) {
+            appendLine("model = ${tomlString(entry.model)}")
+        }
+        val effectiveKey =
+            entry.apiKey.ifBlank {
+                if (needsPlaceholderKey(entry.provider)) PLACEHOLDER_API_KEY else ""
+            }
+        if (effectiveKey.isNotBlank()) {
+            appendLine("api_key = ${tomlString(effectiveKey)}")
+        }
+        if (!uri.isNullOrBlank()) {
+            appendLine("uri = ${tomlString(uri)}")
+        }
+    }
+
+    /**
+     * Appends a `[agents.<name>]` section.
+     *
+     * @param entry The agent to serialize.
+     * @param bindChannels Whether to bind [channels] to this agent.
+     * @param channels Channel references (`<type>.<alias>`) to bind.
+     */
+    private fun StringBuilder.appendAgentSection(
+        entry: AgentTomlEntry,
+        bindChannels: Boolean,
+        channels: List<String>,
+    ) {
+        appendLine()
+        appendLine("[agents.${tomlKey(entry.name)}]")
+        val (type, _) = resolveProviderType(entry.provider)
+        if (type.isNotBlank()) {
+            appendLine("model_provider = ${tomlString("$type.${agentAlias(entry.name)}")}")
+        }
+        // Resolve guardrails through the default risk profile emitted above.
+        appendLine("risk_profile = \"default\"")
+        // Legacy inline fields retained for older consumers; upstream ignores them.
+        appendLine("provider = ${tomlString(entry.provider)}")
+        appendLine("model = ${tomlString(entry.model)}")
+        if (entry.systemPrompt.isNotBlank()) {
+            appendLine("system_prompt = ${tomlString(entry.systemPrompt)}")
+        }
+        val effectiveKey =
+            entry.apiKey.ifBlank {
+                if (needsPlaceholderKey(entry.provider)) PLACEHOLDER_API_KEY else ""
+            }
+        if (effectiveKey.isNotBlank()) {
+            appendLine("api_key = ${tomlString(effectiveKey)}")
+        }
+        if (entry.temperature != null) {
+            appendLine("temperature = ${entry.temperature}")
+        }
+        if (entry.maxDepth != Agent.DEFAULT_MAX_DEPTH) {
+            appendLine("max_depth = ${entry.maxDepth.coerceAtLeast(0)}")
+        }
+        // Bind channels to the primary agent only; the engine maps a channel to
+        // a single owning agent.
+        if (bindChannels && channels.isNotEmpty()) {
+            val refs = channels.joinToString(", ") { tomlString(it) }
+            appendLine("channels = [$refs]")
+        }
+    }
+
+    /**
+     * Splits a resolved provider string into the `providers.models` type key and
+     * an optional endpoint URI.
+     *
+     * @param resolved Provider string from [resolveProvider] (e.g. `openrouter`,
+     *   `custom:http://host/v1`, `anthropic-custom:http://host`).
+     * @return The family type key and optional URI.
+     */
+    internal fun resolveProviderType(resolved: String): Pair<String, String?> =
+        when {
+            resolved.startsWith("custom:") ->
+                "compatible" to resolved.removePrefix("custom:").ifBlank { null }
+            resolved.startsWith("anthropic-custom:") ->
+                "anthropic" to resolved.removePrefix("anthropic-custom:").ifBlank { null }
+            else -> resolved to null
+        }
+
+    /**
+     * Derives a stable provider alias from an agent name.
+     *
+     * Aliases must be bare TOML keys, so non-alphanumeric characters collapse to
+     * `-`; an empty result falls back to `default`.
+     */
+    private fun agentAlias(name: String): String =
+        name
+            .lowercase()
+            .map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '-' }
+            .joinToString("")
+            .trim('-')
+            .ifBlank { "default" }
+
+    /**
+     * Computes the engine channel references for enabled channels.
+     *
+     * The app configures each channel under its type key
+     * (`[channels.<type>.<type>]`), so the reference is `<type>.<type>`.
+     *
+     * @param channelsWithSecrets Enabled channels with their values.
+     * @return Channel references suitable for `agents.<name>.channels`.
+     */
+    fun channelRefs(
+        channelsWithSecrets: List<Pair<ConnectedChannel, Map<String, String>>>,
+    ): List<String> = channelsWithSecrets.map { "${it.first.type.tomlKey}.${it.first.type.tomlKey}" }
 
     /**
      * Appends a single TOML field with the appropriate value format.

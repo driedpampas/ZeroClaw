@@ -163,9 +163,12 @@ class DaemonServiceBridge(
     /**
      * Starts the engine process and waits for the gateway to become healthy.
      *
-     * @param configToml Ignored: the engine owns `config.toml`; the app configures
-     *   it through the gateway config API or dashboard. Retained for call-site
-     *   compatibility.
+     * The app-generated [configToml] (global settings, agents, channels) is
+     * written to the engine's `config.toml` before launch so the daemon starts
+     * with the user's channels and agents; the engine's required gateway keys
+     * (loopback bind + dashboard path) are enforced during the write.
+     *
+     * @param configToml Full app-generated config TOML.
      * @param host Gateway bind address (loopback only in the app).
      * @param port Gateway bind port.
      * @throws EngineException if the engine fails to launch or become healthy.
@@ -178,7 +181,9 @@ class DaemonServiceBridge(
     ) {
         _serviceState.value = ServiceState.STARTING
         try {
-            withContext(ioDispatcher) { engine.start(host, port.toInt()) }
+            withContext(ioDispatcher) {
+                engine.start(host, port.toInt(), configToml = configToml)
+            }
             waitForHealthy()
             _lastError.value = null
             _serviceState.value = ServiceState.RUNNING

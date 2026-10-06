@@ -34,7 +34,9 @@ import org.eu.nl.syu.zeroclaw.model.MemoryConflict
 import org.eu.nl.syu.zeroclaw.model.MemoryHealthResult
 import org.eu.nl.syu.zeroclaw.model.ServiceState
 import org.eu.nl.syu.zeroclaw.util.LogSanitizer
+import org.eu.nl.syu.zeroclaw.util.SecretCipher
 import org.eu.nl.syu.zeroclaw.service.engine.EngineException
+import org.eu.nl.syu.zeroclaw.service.engine.EnginePaths
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -229,12 +231,21 @@ class ZeroClawDaemonService : Service() {
 
             if (!validateProviderKeyOrStop(globalConfig)) return@launch
 
-            val baseToml = ConfigTomlBuilder.build(globalConfig)
+            // Encrypt secrets with the engine's own key so config.toml never
+            // holds plaintext tokens; also unblocks engine-side saves, which
+            // fail when they must create the key themselves (Android forbids
+            // the engine's hard-link key publication).
+            val configDir = EnginePaths.from(this@ZeroClawDaemonService).configDir
+            val encryptSecret: (String) -> String = { value ->
+                SecretCipher.encrypt(value, configDir)
+            }
+            val baseToml = ConfigTomlBuilder.build(globalConfig, encryptSecret)
             val channelsToml =
                 ConfigTomlBuilder.buildChannelsToml(
                     channelConfigRepository.getEnabledWithSecrets(),
+                    encryptSecret,
                 )
-            val agentsToml = buildAgentsToml()
+            val agentsToml = buildAgentsToml(encryptSecret)
             val configToml = baseToml + channelsToml + agentsToml
 
             if (!validateConfigOrStop(configToml)) return@launch
@@ -494,9 +505,14 @@ class ZeroClawDaemonService : Service() {
      * factory name and the corresponding API key is fetched (with OAuth
      * refresh if needed). Agents without a provider or model are skipped.
      *
+     * Enabled channels are bound to the primary (first) agent so the engine's
+     * channel supervisor starts their listeners; an unbound channel is reported
+     * as `inactive` and never connected.
+     *
+     * @param encryptSecret Encryptor applied to each agent's API key.
      * @return TOML string with per-agent sections, or empty if no agents qualify.
      */
-    private suspend fun buildAgentsToml(): String {
+    private suspend fun buildAgentsToml(encryptSecret: ((String) -> String)? = null): String {
         val allAgents = agentRepository.agents.first()
         val entries =
             allAgents
@@ -517,7 +533,11 @@ class ZeroClawDaemonService : Service() {
                         maxDepth = agent.maxDepth,
                     )
                 }
-        return ConfigTomlBuilder.buildAgentsToml(entries)
+        val channelRefs =
+            ConfigTomlBuilder.channelRefs(
+                channelConfigRepository.getEnabledWithSecrets(),
+            )
+        return ConfigTomlBuilder.buildAgentsToml(entries, channelRefs, encryptSecret)
     }
 
     /**

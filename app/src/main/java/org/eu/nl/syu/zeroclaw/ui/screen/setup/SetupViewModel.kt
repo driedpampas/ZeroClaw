@@ -19,6 +19,8 @@ import org.eu.nl.syu.zeroclaw.service.DaemonServiceBridge
 import org.eu.nl.syu.zeroclaw.service.GlobalTomlConfig
 import org.eu.nl.syu.zeroclaw.service.HealthBridge
 import org.eu.nl.syu.zeroclaw.service.SetupOrchestrator
+import org.eu.nl.syu.zeroclaw.service.engine.EnginePaths
+import org.eu.nl.syu.zeroclaw.util.SecretCipher
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -164,12 +166,16 @@ class SetupViewModel(
                 apiKey,
                 String(apiKeyBytes, Charsets.UTF_8),
             )
-        val baseToml = ConfigTomlBuilder.build(globalConfig)
+        val encryptSecret: (String) -> String = { value ->
+            SecretCipher.encrypt(value, EnginePaths.from(app).configDir)
+        }
+        val baseToml = ConfigTomlBuilder.build(globalConfig, encryptSecret)
         val channelsToml =
             ConfigTomlBuilder.buildChannelsToml(
                 app.channelConfigRepository.getEnabledWithSecrets(),
+                encryptSecret,
             )
-        val agentsToml = buildAgentsToml(secretBuffers)
+        val agentsToml = buildAgentsToml(secretBuffers, encryptSecret)
         return baseToml + channelsToml + agentsToml
     }
 
@@ -334,9 +340,13 @@ class SetupViewModel(
      *
      * @param secretBuffers Mutable list to which agent API key buffers are
      *   appended for post-setup cleanup.
+     * @param encryptSecret Encryptor applied to each agent's API key.
      * @return TOML string with per-agent sections, or empty if no agents qualify.
      */
-    private suspend fun buildAgentsToml(secretBuffers: MutableList<ByteArray>): String {
+    private suspend fun buildAgentsToml(
+        secretBuffers: MutableList<ByteArray>,
+        encryptSecret: ((String) -> String)? = null,
+    ): String {
         val allAgents = app.agentRepository.agents.first()
         val entries =
             allAgents
@@ -362,7 +372,9 @@ class SetupViewModel(
                         maxDepth = agent.maxDepth,
                     )
                 }
-        return ConfigTomlBuilder.buildAgentsToml(entries)
+        val channelRefs =
+            ConfigTomlBuilder.channelRefs(app.channelConfigRepository.getEnabledWithSecrets())
+        return ConfigTomlBuilder.buildAgentsToml(entries, channelRefs, encryptSecret)
     }
 
     /**

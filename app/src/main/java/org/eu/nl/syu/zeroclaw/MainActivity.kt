@@ -6,6 +6,7 @@
 
 package org.eu.nl.syu.zeroclaw
 
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -32,10 +33,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE,
-        )
+        // FLAG_SECURE blocks screenshots/screen recording (and adb screencap),
+        // protecting configured secrets. Skip it in debuggable builds so tooling
+        // and developers can capture the UI; release builds keep the protection.
+        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (!debuggable) {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE,
+            )
+        }
         setContent {
             val app = application as ZeroClawApplication
             val settings by app.settingsRepository.settings
