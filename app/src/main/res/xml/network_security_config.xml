@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is denied globally. All cloud provider APIs use HTTPS
+  at the Rust/OkHttp transport layer. The network scanner uses raw TCP
+  sockets for local AI server probes, which bypass this policy per
+  Android's documented best-effort enforcement on java.net.Socket.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

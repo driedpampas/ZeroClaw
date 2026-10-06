@@ -1,0 +1,961 @@
+/*
+ * Copyright 2026 ZeroClaw Community
+ *
+ * Licensed under the MIT License. See LICENSE in the project root.
+ */
+
+package org.eu.nl.syu.zeroclaw.ui.screen.terminal
+
+import android.app.Application
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
+import org.eu.nl.syu.zeroclaw.model.AppSettings
+import org.eu.nl.syu.zeroclaw.model.LogSeverity
+import org.eu.nl.syu.zeroclaw.model.ProcessedImage
+import org.eu.nl.syu.zeroclaw.model.ProviderAuthType
+import org.eu.nl.syu.zeroclaw.model.RefreshCommand
+import org.eu.nl.syu.zeroclaw.model.TerminalEntry
+import org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService
+import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
+import org.eu.nl.syu.zeroclaw.util.ImageProcessor
+import org.eu.nl.syu.zeroclaw.BuildConfig
+import org.eu.nl.syu.zeroclaw.service.engine.EngineException
+import org.eu.nl.syu.zeroclaw.service.engine.GatewayClient
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/**
+ * ViewModel for the terminal REPL screen.
+ *
+ * Routes user input through the [CommandRegistry] to classify it as a Rhai
+ * expression, a local action, or a chat message, then dispatches accordingly.
+ * Rhai expressions are evaluated against the daemon via FFI on
+ * [Dispatchers.IO]. All inputs and outputs are persisted through the
+ * [TerminalEntryRepository][org.eu.nl.syu.zeroclaw.data.repository.TerminalEntryRepository]
+ * so history survives navigation and app restarts.
+ *
+ * Supports image attachments via the photo picker, with vision requests
+ * routed through the `send_vision` Rhai function.
+ *
+ * @param application Application context for accessing repositories and bridges.
+ */
+class TerminalViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
+    private val app = application as ZeroClawApplication
+    private val repository = app.terminalEntryRepository
+    private val logRepository = app.logRepository
+    private val settingsRepository = app.settingsRepository
+    private val agentRepository = app.agentRepository
+    private val apiKeyRepository = app.apiKeyRepository
+
+    private val cachedSettings: StateFlow<AppSettings> =
+        settingsRepository.settings
+            .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
+
+    private val loadingState = MutableStateFlow(false)
+    private val pendingImagesState = MutableStateFlow<List<ProcessedImage>>(emptyList())
+    private val processingImagesState = MutableStateFlow(false)
+    private val _streamingState = MutableStateFlow(StreamingState.idle())
+    private val _history = MutableStateFlow<List<String>>(emptyList())
+    private val _historyIndex = MutableStateFlow(NO_HISTORY_SELECTION)
+
+    /** Gateway client for the loopback engine. */
+    private val gateway = GatewayClient(GatewayClient.loopback())
+
+    /** In-flight agent turn, cancelled by [cancelAgentTurn]. */
+    @Volatile
+    private var turnJob: Job? = null
+
+    /** Whether the agent session is ready (the gateway is stateless per turn). */
+    @Volatile
+    private var sessionReady = false
+
+    /** Observable terminal state combining persisted entries with transient UI state. */
+    val state: StateFlow<TerminalState> =
+        combine(
+            repository.entries,
+            loadingState,
+            pendingImagesState,
+            processingImagesState,
+        ) { entries, loading, images, processingImages ->
+            TerminalState(
+                blocks = entries.map(::toBlock),
+                isLoading = loading,
+                pendingImages = images,
+                isProcessingImages = processingImages,
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TerminalState())
+
+    /** Previous input lines for history navigation, newest last. */
+    val history: StateFlow<List<String>> = _history.asStateFlow()
+
+    /** Current position in the input history, or -1 when not navigating. */
+    val historyIndex: StateFlow<Int> = _historyIndex.asStateFlow()
+
+    /** Observable streaming state for the live agent session. */
+    val streamingState: StateFlow<StreamingState> = _streamingState.asStateFlow()
+
+    init {
+        addWelcomeMessage()
+        initAgentSession()
+    }
+
+    /**
+     * Marks the agent session ready.
+     *
+     * The gateway transport is stateless per turn, so there is nothing to
+     * allocate here.
+     */
+    private fun initAgentSession() {
+        sessionReady = true
+    }
+
+    /**
+     * Returns whether a session is active.
+     *
+     * @return Always `true` for the gateway transport.
+     */
+    @Suppress("RedundantSuspendModifier", "TooGenericExceptionCaught")
+    private suspend fun ensureSession(): Boolean {
+        sessionReady = true
+        return true
+    }
+
+    /**
+     * Tears down the agent session when the ViewModel is destroyed.
+     */
+    override fun onCleared() {
+        super.onCleared()
+        turnJob?.cancel()
+    }
+
+    /**
+     * Submits user input for processing.
+     *
+     * Parses the input through [CommandRegistry.parseAndTranslate] and
+     * dispatches based on the result type:
+     * - [CommandResult.RhaiExpression]: persists the input, evaluates
+     *   via FFI, and persists the response or error.
+     * - [CommandResult.LocalAction]: handles "help" and "clear" locally.
+     * - [CommandResult.ChatMessage]: wraps in a `send()` Rhai call,
+     *   or `send_vision()` when images are attached.
+     *
+     * @param text The raw text entered by the user.
+     */
+    fun submitInput(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() && pendingImagesState.value.isEmpty()) return
+
+        appendToHistory(trimmed)
+        _historyIndex.value = NO_HISTORY_SELECTION
+
+        val result = CommandRegistry.parseAndTranslate(trimmed)
+        when (result) {
+            is CommandResult.RhaiExpression -> executeRhai(trimmed, result.expression)
+            is CommandResult.LocalAction -> handleLocalAction(result.action)
+            is CommandResult.ChatMessage -> executeChatMessage(trimmed, result.text)
+        }
+    }
+
+    /**
+     * Navigates backward (older) through input history.
+     *
+     * @return The history entry at the new position, or `null` if history is empty.
+     */
+    fun historyUp(): String? {
+        val items = _history.value
+        if (items.isEmpty()) return null
+        val current = _historyIndex.value
+        val newIndex =
+            if (current == NO_HISTORY_SELECTION) {
+                items.lastIndex
+            } else {
+                (current - 1).coerceAtLeast(0)
+            }
+        _historyIndex.value = newIndex
+        return items[newIndex]
+    }
+
+    /**
+     * Navigates forward (newer) through input history.
+     *
+     * @return The history entry at the new position, or `null` if past the newest entry.
+     */
+    fun historyDown(): String? {
+        val items = _history.value
+        val current = _historyIndex.value
+        if (current == NO_HISTORY_SELECTION || items.isEmpty()) return null
+        val newIndex = current + 1
+        if (newIndex > items.lastIndex) {
+            _historyIndex.value = NO_HISTORY_SELECTION
+            return null
+        }
+        _historyIndex.value = newIndex
+        return items[newIndex]
+    }
+
+    /**
+     * Processes and stages images from the photo picker.
+     *
+     * Runs [ImageProcessor.process] on [Dispatchers.IO] to downscale,
+     * compress, and base64-encode the selected images. Results are appended
+     * to the pending images list, capped at [MAX_IMAGES].
+     *
+     * @param uris Content URIs returned by the photo picker.
+     */
+    fun attachImages(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            processingImagesState.value = true
+            try {
+                val contentResolver = app.contentResolver
+                val processed = ImageProcessor.process(contentResolver, uris)
+                val current = pendingImagesState.value
+                pendingImagesState.value = (current + processed).take(MAX_IMAGES)
+            } finally {
+                processingImagesState.value = false
+            }
+        }
+    }
+
+    /**
+     * Removes a pending image at the given index.
+     *
+     * @param index Zero-based index into the pending images list.
+     */
+    fun removeImage(index: Int) {
+        val current = pendingImagesState.value
+        if (index in current.indices) {
+            pendingImagesState.value = current.toMutableList().apply { removeAt(index) }
+        }
+    }
+
+    /**
+     * Evaluates a Rhai expression and persists the result.
+     *
+     * Read-only admin commands (`status`, `health`, `config`, `tools`,
+     * `cost`, `events`/`traces`, `cron`, `memories`, `skills`) are served
+     * directly from the loopback gateway HTTP API — they need no agent and
+     * must not consume a `/ws/chat` turn (which fails with HTTP 400 when no
+     * `[agents.<alias>]` matches). Everything else falls back to a chat turn
+     * so the agent can interpret it.
+     *
+     * @param displayText The original user input shown in the scrollback.
+     * @param expression The Rhai expression to evaluate.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun executeRhai(
+        displayText: String,
+        expression: String,
+    ) {
+        loadingState.value = true
+        viewModelScope.launch {
+            repository.append(content = displayText, entryType = ENTRY_TYPE_INPUT)
+            try {
+                val rawResult =
+                    withContext(Dispatchers.IO) {
+                        evaluateAdminExpression(expression) ?: gateway.chatOnce(
+                            app.daemonBridge.resolveAgentAlias(),
+                            sessionId = null,
+                            message = expression,
+                        )
+                    }
+                val cleaned = stripToolCallTags(rawResult)
+                val result =
+                    if (cachedSettings.value.stripThinkingTags) {
+                        stripThinkingTags(cleaned)
+                    } else {
+                        cleaned
+                    }
+                val displayResult =
+                    result.ifBlank {
+                        rawResult.trim().ifBlank { EMPTY_RESPONSE_FALLBACK }
+                    }
+                repository.append(content = displayResult, entryType = ENTRY_TYPE_RESPONSE)
+                handleBindResult(displayResult)
+                emitRefreshIfNeeded(expression)
+            } catch (e: EngineException) {
+                val sanitized = ErrorSanitizer.sanitizeForUi(e)
+                logRepository.append(LogSeverity.ERROR, TAG, "REPL eval failed: $sanitized")
+                repository.append(content = sanitized, entryType = ENTRY_TYPE_ERROR)
+            } catch (e: Exception) {
+                val sanitized = ErrorSanitizer.sanitizeForUi(e)
+                logRepository.append(LogSeverity.ERROR, TAG, "REPL eval failed: $sanitized")
+                repository.append(content = sanitized, entryType = ENTRY_TYPE_ERROR)
+            } finally {
+                loadingState.value = false
+            }
+        }
+    }
+
+    /**
+     * Serves read-only admin expressions directly from the gateway HTTP API.
+     *
+     * Returns the formatted response, or `null` when [expression] is not a
+     * directly-servable admin command (caller falls back to a chat turn).
+     */
+    private suspend fun evaluateAdminExpression(expression: String): String? {
+        val head = expression.trim().substringBefore("(").trim()
+        return try {
+            val result =
+                when (head) {
+                    "status" -> gateway.status()
+                    "version" -> gateway.versionCheck()
+                    "health", "health_component" -> gateway.health()
+                    "config" -> gateway.configList()
+                    "tools" -> gateway.tools()
+                    "cost", "cost_daily", "cost_monthly" -> gateway.cost()
+                    "events", "traces", "traces_filter" -> gateway.logs()
+                    "cron_list", "cron_get", "cron_add", "cron_oneshot",
+                    "cron_remove", "cron_pause", "cron_resume",
+                    "cron_add_at", "cron_add_every",
+                    -> gateway.cron()
+                    "memories", "memories_by_category", "memory_recall",
+                    "memory_forget", "memory_count",
+                    -> gateway.memory()
+                    "skills" -> gateway.skillBundles()
+                    else -> return null
+                }
+            result.toString(2)
+        } catch (e: Exception) {
+            throw e
+        }
+    }
+
+    /**
+     * Dispatches a chat message through the live agent session.
+     *
+     * Both text-only and vision (image-attached) messages are routed
+     * through [executeAgentTurn]. Images are passed as base64 data and
+     * MIME types to the FFI layer where they are embedded as `[IMAGE:...]`
+     * markers for the upstream provider.
+     *
+     * @param displayText The original user input shown in the scrollback.
+     * @param escapedText The Rhai-escaped message text (unused for agent path).
+     */
+    @Suppress("UnusedParameter")
+    private fun executeChatMessage(
+        displayText: String,
+        escapedText: String,
+    ) {
+        val images = pendingImagesState.value
+        pendingImagesState.value = emptyList()
+
+        val inputImageUris = images.map { it.originalUri }
+        viewModelScope.launch {
+            repository.append(
+                content = displayText,
+                entryType = ENTRY_TYPE_INPUT,
+                imageUris = inputImageUris,
+            )
+
+            if (!isChatProviderConfigured()) {
+                repository.append(
+                    content = NO_PROVIDER_WARNING,
+                    entryType = ENTRY_TYPE_SYSTEM,
+                )
+                return@launch
+            }
+
+            executeAgentTurn(displayText, images)
+        }
+    }
+
+    /**
+     * Executes a user message through the live agent session.
+     *
+     * Sends the message over the gateway `/ws/chat` stream.
+     * Progress events are delivered to [_streamingState] through the
+     * [KotlinSessionListener] callback. On completion, the full response
+     * is persisted to the terminal repository.
+     *
+     * Images are passed as separate lists of base64 data and MIME types.
+     * The Rust layer composes `[IMAGE:...]` markers so the upstream
+     * provider can convert them to multimodal content parts.
+     *
+     * @param message The message text to send to the agent.
+     * @param images Attached images to include in the request.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun executeAgentTurn(
+        message: String,
+        images: List<ProcessedImage> = emptyList(),
+    ) {
+        val listener = KotlinSessionListener()
+        _streamingState.update { StreamingState(phase = StreamingPhase.THINKING) }
+
+        turnJob =
+            viewModelScope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        check(ensureSession()) {
+                            "No active session — is the daemon running?"
+                        }
+                        gateway
+                            .chatStream(
+                                app.daemonBridge.resolveAgentAlias(),
+                                sessionId = null,
+                                message = message,
+                            ).collect { frame ->
+                                when (frame) {
+                                    is GatewayClient.ChatFrame.Thinking -> listener.onThinking(frame.text)
+                                    is GatewayClient.ChatFrame.Chunk -> listener.onResponseChunk(frame.text)
+                                    is GatewayClient.ChatFrame.ToolCall ->
+                                        listener.onToolStart(frame.name ?: "tool", frame.args.orEmpty())
+                                    is GatewayClient.ChatFrame.ToolResult -> {
+                                        val name = frame.name ?: "tool"
+                                        listener.onToolResult(name, success = true, durationSecs = 0u)
+                                        listener.onToolOutput(name, frame.output.orEmpty())
+                                    }
+                                    is GatewayClient.ChatFrame.Done -> listener.onComplete(frame.fullResponse)
+                                    is GatewayClient.ChatFrame.Error -> listener.onError(frame.message)
+                                }
+                            }
+                    }
+                } catch (e: CancellationException) {
+                    listener.onCancelled()
+                    throw e
+                } catch (e: Exception) {
+                    val sanitized = ErrorSanitizer.sanitizeForUi(e)
+                    _streamingState.update {
+                        StreamingState(phase = StreamingPhase.ERROR, errorMessage = sanitized)
+                    }
+                    logRepository.append(LogSeverity.ERROR, TAG, "Agent turn failed: $sanitized")
+                    repository.append(content = sanitized, entryType = ENTRY_TYPE_ERROR)
+                } finally {
+                    _streamingState.update { current ->
+                        if (current.phase.isActive) {
+                            StreamingState(
+                                phase = StreamingPhase.ERROR,
+                                errorMessage = "Session ended unexpectedly",
+                            )
+                        } else {
+                            current
+                        }
+                    }
+                }
+            }
+    }
+
+    /**
+     * Cancels the currently running agent turn.
+     *
+     * Cancels the gateway stream job and transitions the streaming state to
+     * [StreamingPhase.CANCELLED].
+     */
+    fun cancelAgentTurn() {
+        turnJob?.cancel()
+        turnJob = null
+        KotlinSessionListener().onCancelled()
+    }
+
+    /**
+     * Checks whether the first enabled agent has a usable chat provider.
+     *
+     * Mirrors the `resolveEffectiveDefaults` pattern from
+     * [ZeroClawDaemonService][org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService].
+     * Providers with [ProviderAuthType.URL_ONLY], [ProviderAuthType.URL_AND_OPTIONAL_KEY],
+     * or [ProviderAuthType.NONE] are considered configured without an API key.
+     * Providers requiring a key ([ProviderAuthType.API_KEY_ONLY],
+     * [ProviderAuthType.API_KEY_OR_OAUTH]) are only considered configured when
+     * a non-blank key exists in the repository.
+     *
+     * @return True if a chat provider is ready for use.
+     */
+    private suspend fun isChatProviderConfigured(): Boolean {
+        val agents = agentRepository.agents.first()
+        val primary =
+            agents.firstOrNull {
+                it.isEnabled && it.provider.isNotBlank() && it.modelName.isNotBlank()
+            } ?: return false
+
+        val providerInfo = ProviderRegistry.findById(primary.provider) ?: return false
+        return when (providerInfo.authType) {
+            ProviderAuthType.URL_ONLY,
+            ProviderAuthType.URL_AND_OPTIONAL_KEY,
+            ProviderAuthType.NONE,
+            -> true
+            ProviderAuthType.API_KEY_ONLY,
+            ProviderAuthType.API_KEY_OR_OAUTH,
+            -> {
+                val key = apiKeyRepository.getByProvider(primary.provider)
+                key != null && key.key.isNotBlank()
+            }
+        }
+    }
+
+    /**
+     * Handles a local action that does not require FFI evaluation.
+     *
+     * @param action The action identifier (e.g. "help", "clear").
+     */
+    private fun handleLocalAction(action: String) {
+        when (action) {
+            "help" -> showHelp()
+            "clear" -> clearTerminal()
+        }
+    }
+
+    /**
+     * Generates and persists the help text listing all available commands.
+     */
+    private fun showHelp() {
+        viewModelScope.launch {
+            repository.append(content = "/help", entryType = ENTRY_TYPE_INPUT)
+            val helpText =
+                buildString {
+                    appendLine("Available commands:")
+                    appendLine()
+                    for (command in CommandRegistry.commands) {
+                        val usage =
+                            if (command.usage.isNotEmpty()) {
+                                " ${command.usage}"
+                            } else {
+                                ""
+                            }
+                        appendLine("  /${command.name}$usage")
+                        appendLine("    ${command.description}")
+                    }
+                    appendLine()
+                    append("Any other input is sent as a chat message.")
+                }
+            repository.append(content = helpText, entryType = ENTRY_TYPE_SYSTEM)
+        }
+    }
+
+    /**
+     * Clears all terminal history and adds a confirmation message.
+     */
+    private fun clearTerminal() {
+        repository.clear()
+        viewModelScope.launch {
+            repository.append(content = CLEAR_CONFIRMATION, entryType = ENTRY_TYPE_SYSTEM)
+        }
+    }
+
+    /**
+     * Inserts the welcome banner as the first terminal entry.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun addWelcomeMessage() {
+        viewModelScope.launch {
+            val version = BuildConfig.VERSION_NAME
+            val banner =
+                if (isChatProviderConfigured()) {
+                    "ZeroClaw Terminal v$version \u2014 Type /help for commands"
+                } else {
+                    "ZeroClaw Terminal v$version \u2014 Admin Console " +
+                        "(no chat provider) \u2014 Type /help for commands"
+                }
+            repository.append(content = banner, entryType = ENTRY_TYPE_SYSTEM)
+        }
+    }
+
+    /**
+     * Appends a non-blank input to the history buffer.
+     *
+     * Duplicate consecutive entries are suppressed to keep the history clean.
+     *
+     * @param text The input text to record.
+     */
+    private fun appendToHistory(text: String) {
+        if (text.isBlank()) return
+        val current = _history.value
+        if (current.lastOrNull() == text) return
+        _history.value = current + text
+    }
+
+    /**
+     * Detects and handles a bind result from the REPL.
+     *
+     * When the user runs `bind("channel", "identity")` in the terminal,
+     * the REPL returns a structured message. This method parses it,
+     * persists the binding to Room, and restarts the daemon so the
+     * channel picks up the new allowlist entry.
+     *
+     * @param response The raw REPL response string.
+     */
+    private suspend fun handleBindResult(response: String) {
+        val match = BIND_RESULT_PATTERN.find(response) ?: return
+        val (userId, channelKey, fieldName) = match.destructured
+
+        val channels = app.channelConfigRepository.channels.first()
+        val channel = channels.find { it.type.tomlKey == channelKey } ?: return
+
+        val currentList = channel.configValues[fieldName].orEmpty()
+        val entries = currentList.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (userId in entries) return
+
+        val updatedList = (entries + userId).joinToString(", ")
+        val updatedValues = channel.configValues.toMutableMap()
+        updatedValues[fieldName] = updatedList
+
+        val updatedChannel = channel.copy(configValues = updatedValues)
+        app.channelConfigRepository.save(
+            updatedChannel,
+            app.channelConfigRepository.getSecrets(channel.id),
+        )
+
+        restartDaemonWithCurrentConfig()
+    }
+
+    /**
+     * Restarts the daemon by sending [ZeroClawDaemonService.ACTION_START].
+     *
+     * The service rebuilds its config from the current Room/DataStore state,
+     * picking up any changes made by [handleBindResult].
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun restartDaemonWithCurrentConfig() {
+        try {
+            val intent =
+                Intent(app, ZeroClawDaemonService::class.java)
+                    .setAction(ZeroClawDaemonService.ACTION_START)
+            app.startForegroundService(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restart daemon after bind: ${e.message}")
+        }
+    }
+
+    /**
+     * Emits a [RefreshCommand] to trigger immediate data refresh in other
+     * ViewModels after a successful mutating REPL command.
+     *
+     * @param expression The Rhai expression that was successfully evaluated.
+     */
+    private fun emitRefreshIfNeeded(expression: String) {
+        val command =
+            when {
+                expression.startsWith("cron_add(") ||
+                    expression.startsWith("cron_oneshot(") ||
+                    expression.startsWith("cron_remove(") ||
+                    expression.startsWith("cron_pause(") ||
+                    expression.startsWith("cron_resume(") -> RefreshCommand.Cron
+                expression.startsWith("send(") ||
+                    expression.startsWith("send_vision(") -> RefreshCommand.Cost
+                expression.startsWith("skill_install(") ||
+                    expression.startsWith("skill_remove(") -> RefreshCommand.Health
+                else -> null
+            }
+        if (command != null) {
+            app.refreshCommands.tryEmit(command)
+        }
+    }
+
+    /**
+     * Callback adapter that translates FFI session events into
+     * [StreamingState] updates and terminal repository entries.
+     *
+     * All methods are called from the tokio runtime thread. State updates
+     * use [MutableStateFlow.update] which is thread-safe.
+     */
+    private inner class KotlinSessionListener {
+        fun onThinking(text: String) {
+            _streamingState.update { current ->
+                current.copy(
+                    phase = StreamingPhase.THINKING,
+                    thinkingText = current.thinkingText + text,
+                )
+            }
+        }
+
+        fun onResponseChunk(text: String) {
+            val cleaned = STREAMING_THINKING_TAG_REGEX.replace(text, "")
+            if (cleaned.isEmpty()) return
+            _streamingState.update { current ->
+                current.copy(
+                    phase = StreamingPhase.RESPONDING,
+                    responseText = current.responseText + cleaned,
+                    providerRound = 0,
+                    toolCallCount = 0,
+                    llmDurationSecs = 0,
+                )
+            }
+        }
+
+        fun onToolStart(
+            name: String,
+            argumentsHint: String,
+        ) {
+            _streamingState.update { current ->
+                current.copy(
+                    phase = StreamingPhase.TOOL_EXECUTING,
+                    activeTools = current.activeTools + ToolProgress(name, argumentsHint),
+                )
+            }
+        }
+
+        fun onToolResult(
+            name: String,
+            success: Boolean,
+            durationSecs: ULong,
+        ) {
+            _streamingState.update { current ->
+                current.copy(
+                    activeTools = current.activeTools.filter { it.name != name },
+                    toolResults =
+                        current.toolResults +
+                            ToolResultEntry(
+                                name = name,
+                                success = success,
+                                durationSecs = durationSecs.toLong(),
+                            ),
+                )
+            }
+        }
+
+        fun onToolOutput(
+            name: String,
+            output: String,
+        ) {
+            _streamingState.update { current ->
+                val updated =
+                    current.toolResults.map { entry ->
+                        if (entry.name == name && entry.output.isEmpty()) {
+                            entry.copy(output = output)
+                        } else {
+                            entry
+                        }
+                    }
+                current.copy(toolResults = updated)
+            }
+        }
+
+        fun onComplete(fullResponse: String) {
+            val cleaned = stripToolCallTags(fullResponse)
+            val stripped =
+                if (cachedSettings.value.stripThinkingTags) {
+                    stripThinkingTags(cleaned)
+                } else {
+                    cleaned
+                }
+            val display = stripped.ifBlank { EMPTY_RESPONSE_FALLBACK }
+
+            viewModelScope.launch {
+                repository.append(content = display, entryType = ENTRY_TYPE_RESPONSE)
+            }
+
+            _streamingState.update { StreamingState(phase = StreamingPhase.COMPLETE) }
+
+            app.refreshCommands.tryEmit(RefreshCommand.Cost)
+        }
+
+        fun onError(error: String) {
+            val sanitized = ErrorSanitizer.sanitizeMessage(error)
+
+            viewModelScope.launch {
+                repository.append(content = sanitized, entryType = ENTRY_TYPE_ERROR)
+                logRepository.append(LogSeverity.ERROR, TAG, "Agent session error: $sanitized")
+            }
+
+            _streamingState.update {
+                StreamingState(phase = StreamingPhase.ERROR, errorMessage = sanitized)
+            }
+        }
+
+        fun onCancelled() {
+            viewModelScope.launch {
+                repository.append(
+                    content = "Request cancelled.",
+                    entryType = ENTRY_TYPE_SYSTEM,
+                )
+            }
+
+            _streamingState.update {
+                StreamingState(phase = StreamingPhase.CANCELLED)
+            }
+        }
+    }
+
+    /** Constants for [TerminalViewModel]. */
+    companion object {
+        private const val TAG = "Terminal"
+
+        /** Timeout in milliseconds before upstream Flow collection stops. */
+        private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** Maximum number of images per message (matches FFI-side limit). */
+        private const val MAX_IMAGES = 5
+
+        /** Sentinel value indicating no history selection is active. */
+        private const val NO_HISTORY_SELECTION = -1
+
+        /** Entry type constant for user input entries. */
+        private const val ENTRY_TYPE_INPUT = "input"
+
+        /** Entry type constant for daemon response entries. */
+        private const val ENTRY_TYPE_RESPONSE = "response"
+
+        /** Entry type constant for error entries. */
+        private const val ENTRY_TYPE_ERROR = "error"
+
+        /** Entry type constant for system message entries. */
+        private const val ENTRY_TYPE_SYSTEM = "system"
+
+        /** Displayed when the model response is empty after stripping markup. */
+        private const val EMPTY_RESPONSE_FALLBACK =
+            "The model did not generate a text response."
+
+        /** Confirmation message shown after clearing the terminal. */
+        private const val CLEAR_CONFIRMATION = "Terminal cleared."
+
+        /** Warning shown when user sends a chat message without a configured provider. */
+        private const val NO_PROVIDER_WARNING =
+            "No chat provider configured \u2014 use /help to see admin commands, " +
+                "or add a provider in Settings > API Keys."
+
+        /**
+         * Pattern matching chain-of-thought and internal reasoning tags
+         * across models.
+         *
+         * Covers `<think>`, `<thinking>`, `<reasoning>`, `<commentary>`,
+         * `<tool_output>`, `<analysis>`, `<reflection>`, and
+         * `<inner_monologue>` tag pairs.
+         */
+        private val THINKING_TAG_REGEX =
+            Regex(
+                "<(?:think|thinking|reasoning|commentary|tool_output" +
+                    "|analysis|reflection|inner_monologue)>" +
+                    "[\\s\\S]*?" +
+                    "</(?:think|thinking|reasoning|commentary|tool_output" +
+                    "|analysis|reflection|inner_monologue)>",
+                RegexOption.IGNORE_CASE,
+            )
+
+        /**
+         * Pattern matching tool-call markup leaked by models that support
+         * function calling.
+         *
+         * Matches self-closing tags (`<tool_call name="..." args="..."/>`),
+         * complete blocks (`<tool_call>...</tool_call>`), and unclosed tags
+         * through end-of-string. Also covers the `<function_call>` variant
+         * used by some models.
+         */
+        private val TOOL_CALL_TAG_REGEX =
+            Regex(
+                "<(?:tool_call|function_call)\\b[\\s\\S]*?/>" +
+                    "|<(?:tool_call|function_call)>[\\s\\S]*?</(?:tool_call|function_call)>" +
+                    "|<(?:tool_call|function_call)[\\s\\S]*$",
+                RegexOption.IGNORE_CASE,
+            )
+
+        /** Strips leaked thinking tags from streamed response chunks. */
+        private val STREAMING_THINKING_TAG_REGEX =
+            Regex(
+                "</?(?:think|thinking|reasoning|analysis|reflection|inner_monologue)>",
+                RegexOption.IGNORE_CASE,
+            )
+
+        /** Pattern matching successful REPL bind results. */
+        val BIND_RESULT_PATTERN: Regex =
+            Regex("""Bound (.+) to (\w+) \((\w+)\)\. Restart daemon to apply\.""")
+
+        /**
+         * Removes chain-of-thought and internal reasoning tags from a model response.
+         *
+         * Strips `<think>`, `<thinking>`, `<commentary>`, `<tool_output>`,
+         * `<analysis>`, `<reflection>`, and `<inner_monologue>` blocks
+         * emitted by reasoning models.
+         *
+         * @param text Raw model response.
+         * @return Response with reasoning blocks removed and whitespace trimmed.
+         */
+        fun stripThinkingTags(text: String): String = text.replace(THINKING_TAG_REGEX, "").trim()
+
+        /**
+         * Removes tool-call markup from a model response.
+         *
+         * Some models (notably Qwen) emit raw `<tool_call>` tags in their
+         * text content when they attempt a function call with no tools
+         * available or produce a malformed tool invocation.
+         *
+         * @param text Raw model response.
+         * @return Response with tool-call blocks removed and whitespace trimmed.
+         */
+        fun stripToolCallTags(text: String): String = text.replace(TOOL_CALL_TAG_REGEX, "").trim()
+
+        /**
+         * Maps a persisted [TerminalEntry] to a display [TerminalBlock].
+         *
+         * Response entries whose content starts with `{` or `[` are
+         * classified as [TerminalBlock.Structured] for JSON rendering.
+         *
+         * @param entry The persisted terminal entry.
+         * @return The corresponding display block.
+         */
+        fun toBlock(entry: TerminalEntry): TerminalBlock =
+            when (entry.entryType) {
+                ENTRY_TYPE_INPUT ->
+                    TerminalBlock.Input(
+                        id = entry.id,
+                        timestamp = entry.timestamp,
+                        text = entry.content,
+                        imageNames =
+                            entry.imageUris.map { uri ->
+                                uri.substringAfterLast('/')
+                            },
+                    )
+                ENTRY_TYPE_RESPONSE -> {
+                    val trimmed = entry.content.trimStart()
+                    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                        TerminalBlock.Structured(
+                            id = entry.id,
+                            timestamp = entry.timestamp,
+                            json = entry.content,
+                        )
+                    } else {
+                        TerminalBlock.Response(
+                            id = entry.id,
+                            timestamp = entry.timestamp,
+                            content = entry.content,
+                        )
+                    }
+                }
+                ENTRY_TYPE_ERROR ->
+                    TerminalBlock.Error(
+                        id = entry.id,
+                        timestamp = entry.timestamp,
+                        message = entry.content,
+                    )
+                else ->
+                    TerminalBlock.System(
+                        id = entry.id,
+                        timestamp = entry.timestamp,
+                        text = entry.content,
+                    )
+            }
+    }
+}
+
+/**
+ * Immutable snapshot of the terminal REPL screen state.
+ *
+ * @property blocks Ordered list of terminal blocks for the scrollback buffer.
+ * @property isLoading True while waiting for an FFI response.
+ * @property pendingImages Images staged for the next message.
+ * @property isProcessingImages True while images are being downscaled and encoded.
+ */
+data class TerminalState(
+    val blocks: List<TerminalBlock> = emptyList(),
+    val isLoading: Boolean = false,
+    val pendingImages: List<ProcessedImage> = emptyList(),
+    val isProcessingImages: Boolean = false,
+)

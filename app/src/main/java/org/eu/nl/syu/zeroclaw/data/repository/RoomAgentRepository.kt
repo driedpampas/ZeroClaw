@@ -1,0 +1,60 @@
+/*
+ * Copyright 2026 ZeroClaw Community
+ *
+ * Licensed under the MIT License. See LICENSE in the project root.
+ */
+
+package org.eu.nl.syu.zeroclaw.data.repository
+
+import org.eu.nl.syu.zeroclaw.data.local.dao.AgentDao
+import org.eu.nl.syu.zeroclaw.data.local.entity.toEntity
+import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
+import org.eu.nl.syu.zeroclaw.model.Agent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+/**
+ * Room-backed [AgentRepository] implementation.
+ *
+ * Delegates all persistence operations to [AgentDao] and maps between
+ * entity and domain model layers.
+ *
+ * @param dao The data access object for agent operations.
+ */
+class RoomAgentRepository(
+    private val dao: AgentDao,
+) : AgentRepository {
+    override val agents: Flow<List<Agent>> =
+        dao.observeAll().map { entities -> entities.map { it.toModel() } }
+
+    override suspend fun getById(id: String): Agent? = dao.getById(id)?.toModel()
+
+    override suspend fun save(agent: Agent) {
+        dao.upsert(agent.toEntity())
+    }
+
+    override suspend fun delete(id: String) {
+        dao.deleteById(id)
+    }
+
+    override suspend fun toggleEnabled(id: String) {
+        dao.toggleEnabled(id)
+    }
+
+    override suspend fun updatePrimaryAgentModel(model: String) {
+        val primary =
+            agents.first().firstOrNull {
+                it.isEnabled && it.provider.isNotBlank()
+            } ?: return
+        save(primary.copy(modelName = model))
+    }
+
+    override suspend fun updatePrimaryAgentProvider(provider: String) {
+        val primary =
+            agents.first().firstOrNull {
+                it.isEnabled && it.provider.isNotBlank()
+            } ?: return
+        save(primary.copy(provider = provider))
+    }
+}

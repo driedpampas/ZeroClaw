@@ -1,0 +1,326 @@
+/*
+ * Copyright 2026 ZeroClaw Community
+ *
+ * Licensed under the MIT License. See LICENSE in the project root.
+ */
+
+package org.eu.nl.syu.zeroclaw.service.engine
+
+import android.content.Context
+import android.util.Log
+import java.io.File
+import java.io.IOException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+
+/**
+ * Owns the lifecycle of the bundled ZeroClaw engine process.
+ *
+ * The engine runs as a separate OS process (`zeroclaw daemon`) rather than
+ * in-process through FFI. The app talks to it exclusively over the loopback
+ * gateway HTTP/WebSocket API, and the engine owns its `config.toml`. This keeps
+ * the wrapper stable across upstream releases: the gateway API and config
+ * schema are the only contract.
+ *
+ * The process is started from the APK's native library directory, the only
+ * location from which an app may `exec` on API 29+.
+ *
+ * @param context Application context used to resolve paths and assets.
+ * @param paths Resolved engine filesystem layout.
+ * @param ioDispatcher Dispatcher for blocking process and I/O work.
+ */
+class EngineProcessManager(
+    context: Context,
+    private val paths: EnginePaths = EnginePaths.from(context),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    private val appContext = context.applicationContext
+
+    private val lifecycleLock = Mutex()
+
+    @Volatile
+    private var process: Process? = null
+
+    /** Whether the managed engine process is currently alive. */
+    val isRunning: Boolean
+        get() = process?.isAlive == true
+
+    /** Process id of the running engine, or `null` when stopped or unavailable. */
+    val pid: Long?
+        get() = null
+
+    /**
+     * Starts the engine if it is not already running.
+     *
+     * On first run this extracts the bundled web dashboard and writes a
+     * minimal bootstrap `config.toml` that disables pairing (the gateway is
+     * loopback-only) and points `gateway.web_dist_dir` at the extracted
+     * dashboard. An existing config is never overwritten, so edits made
+     * through the dashboard survive restarts.
+     *
+     * @param host Loopback host to bind (default `127.0.0.1`).
+     * @param port Gateway port (default 42617, upstream's default).
+     * @param mode `daemon` (gateway + channels + scheduler) or `gateway`.
+     * @throws EngineStartException when the binary is missing or fails to launch.
+     */
+    suspend fun start(
+        host: String = DEFAULT_HOST,
+        port: Int = DEFAULT_PORT,
+        mode: String = MODE_DAEMON,
+    ): Unit =
+        withContext(ioDispatcher) {
+            lifecycleLock.withLock {
+                if (isRunning) {
+                    Log.i(TAG, "Engine already running (pid=${pid})")
+                    return@withLock
+                }
+                val executable = paths.executable(appContext)
+                if (!executable.canExecute()) {
+                    throw EngineStartException(
+                        "Engine binary is not executable: ${executable.absolutePath}",
+                    )
+                }
+                // Android can leave the engine running after the app process is
+                // killed (force-stop, update, crash). An orphan holds the
+                // daemon's Unix IPC socket, so a new engine's `bind()` fails
+                // with "binding local IPC endpoint". Reap orphans and clear
+                // stale socket artifacts before launching.
+                killOrphanEngines()
+                cleanStaleEndpointArtifacts()
+                ensureWebAssets()
+                ensureBootstrapConfig(host, port)
+
+                val started = launch(executable, host, port, mode)
+                // `daemon` refuses to run when the config has no usable agent or
+                // when security sections were dropped. Fall back to a bare
+                // gateway so the dashboard and config API remain reachable and
+                // the operator can complete setup there.
+                if (mode == MODE_DAEMON && !awaitAlive(started)) {
+                    Log.w(TAG, "daemon mode exited during startup; falling back to gateway mode")
+                    process = null
+                    launch(executable, host, port, MODE_GATEWAY)
+                }
+                Log.i(TAG, "Engine started")
+            }
+        }
+
+    private fun launch(
+        executable: File,
+        host: String,
+        port: Int,
+        mode: String,
+    ): Process {
+        val command =
+            listOf(
+                executable.absolutePath,
+                "--config-dir",
+                paths.configDir.absolutePath,
+                mode,
+                "--host",
+                host,
+                "--port",
+                port.toString(),
+            )
+        Log.i(TAG, "Launching engine: ${command.joinToString(" ")}")
+        val started =
+            try {
+                newProcessBuilder(command)
+            } catch (e: IOException) {
+                throw EngineStartException("Failed to launch engine: ${e.message}", e)
+            }
+        process = started
+        return started
+    }
+
+    /** Returns true if the process is still alive after a short settling period. */
+    private fun awaitAlive(process: Process): Boolean {
+        val deadline = System.currentTimeMillis() + START_SETTLE_MS
+        while (System.currentTimeMillis() < deadline) {
+            if (!process.isAlive) return false
+            Thread.sleep(START_SETTLE_POLL_MS)
+        }
+        return process.isAlive
+    }
+
+    /**
+     * Terminates any engine process left over from a previous app instance.
+     *
+     * The Android app can be killed (force-stop, package update, crash) while
+     * the engine child keeps running. Because the engine is owned by the same
+     * UID, the app is allowed to signal it. Orphans are identified by scanning
+     * `/proc/<pid>/cmdline` for the engine binary name.
+     */
+    private fun killOrphanEngines() {
+        val myPid = android.os.Process.myPid()
+        File(PROC_ROOT)
+            .listFiles()
+            ?.forEach { entry ->
+                val pid = entry.name.toIntOrNull() ?: return@forEach
+                if (pid == myPid) return@forEach
+                val cmdline =
+                    runCatching { File(entry, "cmdline").readText() }.getOrNull()
+                        ?: return@forEach
+                if (!cmdline.contains(EnginePaths.ENGINE_BINARY_NAME)) return@forEach
+
+                Log.w(TAG, "Terminating orphaned engine pid=$pid")
+                runCatching { android.system.Os.kill(pid, android.system.OsConstants.SIGTERM) }
+                var waited = 0L
+                while (waited < ORPHAN_WAIT_MS && File("/proc/$pid").exists()) {
+                    Thread.sleep(ORPHAN_POLL_MS)
+                    waited += ORPHAN_POLL_MS
+                }
+                if (File("/proc/$pid").exists()) {
+                    runCatching { android.system.Os.kill(pid, android.system.OsConstants.SIGKILL) }
+                }
+            }
+    }
+
+    /**
+     * Removes stale Unix-socket artifacts so the engine's `bind()` cannot fail.
+     *
+     * The lifecycle lock is intentionally persistent upstream; removing it here
+     * is safe because any prior owner was just reaped (or is unreachable), and
+     * unlinking it gives the new engine a fresh inode to lock.
+     */
+    private fun cleanStaleEndpointArtifacts() {
+        paths.dataDir.mkdirs()
+        File(paths.dataDir, "daemon.sock").delete()
+        File(paths.dataDir, "daemon.sock.lock").delete()
+    }
+
+    /**
+     * Stops the engine process and waits briefly for it to exit.
+     *
+     * @param graceMillis Milliseconds to wait after a graceful destroy before
+     *   forcing termination.
+     */
+    suspend fun stop(graceMillis: Long = DEFAULT_GRACE_MILLIS): Unit =
+        withContext(ioDispatcher) {
+            lifecycleLock.withLock {
+                val current = process ?: return@withLock
+                if (!current.isAlive) {
+                    process = null
+                    return@withLock
+                }
+                Log.i(TAG, "Stopping engine")
+                current.destroy()
+                val exited = current.waitFor(graceMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                if (!exited) {
+                    Log.w(TAG, "Engine did not exit gracefully; forcing")
+                    current.destroyForcibly()
+                    current.waitFor()
+                }
+                process = null
+            }
+        }
+
+    private fun newProcessBuilder(command: List<String>): Process {
+        val builder = ProcessBuilder(command)
+        builder.directory(paths.configDir)
+        builder.redirectErrorStream(true)
+        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(paths.logFile))
+        builder.environment().apply {
+            put("HOME", appContext.filesDir.absolutePath)
+            put("ZEROCLAW_CONFIG_DIR", paths.configDir.absolutePath)
+            put("ZEROCLAW_LOG_LEVEL", "info")
+        }
+        return builder.start()
+    }
+
+    /** Extracts the bundled dashboard assets into [EnginePaths.webDir]. */
+    private fun ensureWebAssets() {
+        val marker = File(paths.webDir, ASSET_VERSION_MARKER)
+        val targetVersion = org.eu.nl.syu.zeroclaw.BuildConfig.VERSION_NAME
+        val currentVersion = marker.takeIf { it.isFile }?.readText()?.trim()
+        if (currentVersion == targetVersion && File(paths.webDir, "index.html").isFile) {
+            return
+        }
+        Log.i(TAG, "Extracting bundled web dashboard to ${paths.webDir.absolutePath}")
+        paths.webDir.deleteRecursively()
+        paths.webDir.mkdirs()
+        copyAssetTree(WEB_ASSET_ROOT, paths.webDir)
+        marker.writeText(targetVersion)
+    }
+
+    private fun copyAssetTree(assetPath: String, targetDir: File) {
+        val children = appContext.assets.list(assetPath).orEmpty()
+        if (children.isEmpty()) {
+            // Leaf asset: copy the file.
+            targetDir.parentFile?.mkdirs()
+            appContext.assets.open(assetPath).use { input ->
+                targetDir.outputStream().use { output -> input.copyTo(output) }
+            }
+            return
+        }
+        targetDir.mkdirs()
+        for (child in children) {
+            copyAssetTree("$assetPath/$child", File(targetDir, child))
+        }
+    }
+
+    /**
+     * Writes the bootstrap config when absent and repairs the two values the
+     * app depends on (loopback bind + dashboard path) without touching any
+     * other operator-managed key.
+     */
+    private fun ensureBootstrapConfig(host: String, port: Int) {
+        paths.configDir.mkdirs()
+        val config = paths.configFile
+        val webDir = paths.webDir.absolutePath
+        if (!config.isFile) {
+            config.writeText(
+                buildString {
+                    appendLine("schema_version = 3")
+                    appendLine()
+                    appendLine("[gateway]")
+                    appendLine("host = \"$host\"")
+                    appendLine("port = $port")
+                    appendLine("require_pairing = false")
+                    appendLine("check_updates = false")
+                    appendLine("allow_self_upgrade = false")
+                    appendLine("web_dist_dir = \"$webDir\"")
+                },
+            )
+            return
+        }
+        // Keep the dashboard path valid across reinstalls without rewriting the
+        // rest of the file.
+        val text = config.readText()
+        if (!text.contains(webDir)) {
+            val patched =
+                if (text.contains(Regex("(?m)^web_dist_dir\\s*="))) {
+                    text.replace(Regex("(?m)^web_dist_dir\\s*=.*$"), "web_dist_dir = \"$webDir\"")
+                } else {
+                    text.trimEnd() + "\nweb_dist_dir = \"$webDir\"\n"
+                }
+            config.writeText(patched)
+        }
+    }
+
+    /** Engine startup failure with a human-readable reason. */
+    class EngineStartException(
+        message: String,
+        cause: Throwable? = null,
+    ) : IOException(message, cause)
+
+    companion object {
+        private const val TAG = "EngineProcessManager"
+        private const val DEFAULT_HOST = "127.0.0.1"
+
+        /** Upstream default gateway port. */
+        const val DEFAULT_PORT = 42617
+        const val MODE_DAEMON = "daemon"
+        const val MODE_GATEWAY = "gateway"
+        private const val DEFAULT_GRACE_MILLIS = 5_000L
+        private const val START_SETTLE_MS = 1_500L
+        private const val START_SETTLE_POLL_MS = 150L
+        private const val PROC_ROOT = "/proc"
+        private const val ORPHAN_WAIT_MS = 3_000L
+        private const val ORPHAN_POLL_MS = 100L
+        private const val ASSET_VERSION_MARKER = ".asset_version"
+        private const val WEB_ASSET_ROOT = "zeroclaw-web"
+    }
+}

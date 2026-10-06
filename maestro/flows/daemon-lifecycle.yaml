@@ -1,0 +1,14 @@
+appId: org.eu.nl.syu.zeroclaw
+tags:
+  - journey
+  - daemon
+---
+- runFlow: ../subflows/complete-onboarding.yaml
+- tapOn: "Start Daemon"
+- extendedWaitUntil:
+    visible: "Running"
+    timeout: 10000
+- tapOn: "Stop Daemon"
+- extendedWaitUntil:
+    visible: "Stopped"
+    timeout: 5000
