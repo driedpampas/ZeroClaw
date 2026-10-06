@@ -4,7 +4,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -74,14 +73,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     testOptions {
         unitTests.isReturnDefaultValues = true
         managedDevices {
-            devices {
+            allDevices {
                 create<com.android.build.api.dsl.ManagedVirtualDevice>("pixel7Api35") {
                     device = "Pixel 7"
                     apiLevel = 35
@@ -90,14 +85,14 @@ android {
             }
             groups {
                 create("ci") {
-                    targetDevices.add(devices.getByName("pixel7Api35"))
+                    targetDevices.add(allDevices.getByName("pixel7Api35"))
                 }
             }
         }
     }
 
     sourceSets {
-        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
 
     buildFeatures {
@@ -114,6 +109,12 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -178,6 +179,7 @@ dependencies {
 
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
+    testRuntimeOnly(libs.junit5.launcher)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
@@ -196,6 +198,10 @@ detekt {
     config.setFrom(files("${rootProject.projectDir}/config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
     allRules = false
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
 }
 
 spotless {
