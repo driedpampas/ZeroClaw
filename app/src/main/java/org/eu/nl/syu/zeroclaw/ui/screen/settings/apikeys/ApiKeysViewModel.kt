@@ -919,6 +919,9 @@ class ApiKeysViewModel(
                     configToml = configToml,
                     expectedChannels = channels,
                     port = validPort.toUShort(),
+                    onSyncChannels = {
+                        daemonBridge.syncChannels(channelConfigRepository.getEnabledWithSecrets())
+                    },
                 )
             } catch (e: CancellationException) {
                 throw e

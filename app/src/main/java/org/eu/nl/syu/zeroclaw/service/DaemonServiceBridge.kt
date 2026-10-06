@@ -22,11 +22,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.eu.nl.syu.zeroclaw.model.ComponentStatus
+import org.eu.nl.syu.zeroclaw.model.ConnectedChannel
 import org.eu.nl.syu.zeroclaw.model.DaemonStatus
 import org.eu.nl.syu.zeroclaw.model.KeyRejectionEvent
 import org.eu.nl.syu.zeroclaw.model.MemoryConflict
 import org.eu.nl.syu.zeroclaw.model.MemoryHealthResult
 import org.eu.nl.syu.zeroclaw.model.ServiceState
+import org.eu.nl.syu.zeroclaw.service.engine.EngineChannelSync
 import org.eu.nl.syu.zeroclaw.service.engine.EngineCli
 import org.eu.nl.syu.zeroclaw.service.engine.EngineConfigSync
 import org.eu.nl.syu.zeroclaw.service.engine.EngineException
@@ -495,6 +497,31 @@ class DaemonServiceBridge(
                 false
             }
         }
+
+    /**
+     * Writes the app's channels to the engine config and binds them to the
+     * active agent.
+     *
+     * The engine owns `config.toml`; this is how the app, as manager and
+     * configurator, applies channel configuration and sets
+     * `agents.<alias>.channels`. Failures are reported, not thrown, so setup
+     * can continue and the Doctor can surface the problem.
+     *
+     * @param channels Enabled channels with their full (including secret) values.
+     * @return The sync outcome.
+     */
+    suspend fun syncChannels(
+        channels: List<Pair<ConnectedChannel, Map<String, String>>>,
+    ): EngineChannelSync.Result {
+        val alias = resolveAgentAlias()
+        val result = EngineChannelSync(gateway, ioDispatcher).syncChannels(channels, alias)
+        if (result.applied) {
+            Log.i(TAG, "Bound channels to agent '$alias': ${result.boundRefs}")
+        } else {
+            Log.w(TAG, "Channel sync not applied: ${result.error}")
+        }
+        return result
+    }
 
     /**
      * Stops and re-starts the engine with a fresh configuration.

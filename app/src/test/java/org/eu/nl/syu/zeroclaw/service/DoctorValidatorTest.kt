@@ -60,6 +60,31 @@ class DoctorValidatorTest {
     }
 
     @Test
+    @DisplayName("nested /api/status health snapshot parses components and uptime")
+    fun `nested health snapshot parses`() {
+        val checks =
+            validator.parseDaemonStatus(
+                JSONObject(
+                    """{"health": {"uptime_seconds": 7, "components": {"socket": {"status": "ok"}}}}""",
+                ),
+            )
+        assertEquals(CheckStatus.PASS, checks.first { it.id == "daemon-component-socket" }.status)
+        assertEquals("7s", checks.first { it.id == "daemon-uptime" }.detail)
+    }
+
+    @Test
+    @DisplayName("starting component is a warning, not a failure")
+    fun `starting component warns`() {
+        val checks =
+            validator.parseDaemonStatus(
+                JSONObject(
+                    """{"health": {"components": {"channel:discord.discord": {"status": "starting"}}}}""",
+                ),
+            )
+        assertEquals(CheckStatus.WARN, checks.first { it.id == "daemon-component-channel:discord.discord" }.status)
+    }
+
+    @Test
     @DisplayName("engine-unknown expected channel yields warning")
     fun `missing expected channel warns`() {
         val checks =
@@ -81,6 +106,79 @@ class DoctorValidatorTest {
                 expectedChannels = listOf("discord"),
             )
         assertTrue(checks.none { it.id.startsWith("channel-missing-") })
+    }
+
+    @Test
+    @DisplayName("composite channel name matches bare expected type")
+    fun `composite name matches expected type`() {
+        val checks =
+            validator.parseChannelDiagnostics(
+                """[{"name": "discord.discord", "type": "discord", "alias": "discord", "status": "unknown", "health": "degraded"}]""",
+                expectedChannels = listOf("discord"),
+            )
+        assertTrue(checks.none { it.id.startsWith("channel-missing-") })
+    }
+
+    @Test
+    @DisplayName("running listener makes a degraded channel connected")
+    fun `listener health makes degraded channel pass`() {
+        val checks =
+            validator.parseChannelDiagnostics(
+                """[{"name": "discord.discord", "type": "discord", "alias": "discord", "status": "unknown", "health": "degraded", "owning_agent": null, "readiness": {"requirements": ["Bind this channel to an enabled agent."], "notes": []}}]""",
+                expectedChannels = listOf("discord"),
+                componentHealth = mapOf("channel:discord.discord" to "ok"),
+            )
+        val channel = checks.first { it.id == "channel-discord.discord" }
+        assertEquals(CheckStatus.PASS, channel.status)
+        assertEquals("Connected", channel.detail)
+    }
+
+    @Test
+    @DisplayName("degraded channel without listener is a warning, not offline")
+    fun `degraded channel warns not fails`() {
+        val checks =
+            validator.parseChannelDiagnostics(
+                """[{"name": "discord.discord", "type": "discord", "alias": "discord", "status": "unknown", "health": "degraded", "owning_agent": null, "readiness": {"requirements": ["Bind this channel to an enabled agent."], "notes": []}}]""",
+                expectedChannels = listOf("discord"),
+            )
+        val channel = checks.first { it.id == "channel-discord.discord" }
+        assertEquals(CheckStatus.WARN, channel.status)
+        assertEquals("Bind this channel to an enabled agent.", channel.detail)
+    }
+
+    @Test
+    @DisplayName("down channel fails with the listener reason")
+    fun `down channel fails`() {
+        val checks =
+            validator.parseChannelDiagnostics(
+                """[{"name": "discord.discord", "type": "discord", "alias": "discord", "status": "error", "health": "down"}]""",
+                componentHealth = mapOf("channel:discord.discord" to "error"),
+            )
+        assertEquals(CheckStatus.FAIL, checks.first { it.id == "channel-discord.discord" }.status)
+    }
+
+    @Test
+    @DisplayName("healthy listener does not mask an engine-reported down channel")
+    fun `healthy listener does not mask down channel`() {
+        // Webhook awaiting pairing: readiness is error/down while its supervised
+        // listener component is ok. The failure must win.
+        val checks =
+            validator.parseChannelDiagnostics(
+                """[{"name": "webhook.main", "type": "webhook", "alias": "main", "status": "error", "health": "down"}]""",
+                componentHealth = mapOf("channel:webhook.main" to "ok"),
+            )
+        assertEquals(CheckStatus.FAIL, checks.first { it.id == "channel-webhook.main" }.status)
+    }
+
+    @Test
+    @DisplayName("listener component lookup is case-insensitive")
+    fun `listener component lookup ignores case`() {
+        val checks =
+            validator.parseChannelDiagnostics(
+                """[{"name": "clawdtalk.clawdtalk", "type": "clawdtalk", "alias": "clawdtalk", "status": "unknown", "health": "degraded", "owning_agent": "main"}]""",
+                componentHealth = mapOf("channel:ClawdTalk.clawdtalk" to "ok"),
+            )
+        assertEquals(CheckStatus.PASS, checks.first { it.id == "channel-clawdtalk.clawdtalk" }.status)
     }
 
     @Test

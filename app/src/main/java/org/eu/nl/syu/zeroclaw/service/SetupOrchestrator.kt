@@ -80,6 +80,9 @@ class SetupOrchestrator(
      * @param onRebuildToml Callback that rebuilds the TOML config from current
      *   Room state (after channels have been disabled). When null, no restart
      *   is attempted after channel failures.
+     * @param onSyncChannels Callback that writes the app's channel config to the
+     *   engine and binds the channels to the active agent via the gateway config
+     *   API. When null, no channel sync is attempted.
      * @throws CancellationException if the calling coroutine is cancelled.
      */
     @Suppress("LongParameterList", "TooGenericExceptionCaught")
@@ -95,6 +98,7 @@ class SetupOrchestrator(
         port: UShort,
         onDisableChannel: (suspend (channelTomlKey: String) -> Unit)? = null,
         onRebuildToml: (suspend () -> String)? = null,
+        onSyncChannels: (suspend () -> Unit)? = null,
     ) {
         _progress.value =
             SetupProgress(
@@ -106,6 +110,7 @@ class SetupOrchestrator(
         stopDaemonIfRunning()
         if (!stepStartDaemon(context, configToml, host, port)) return
         if (!stepAwaitDaemonHealth()) return
+        stepSyncChannels(onSyncChannels)
         stepAwaitChannelsResilient(
             expectedChannels = expectedChannels,
             context = context,
@@ -133,15 +138,19 @@ class SetupOrchestrator(
      * @param expectedChannels List of channel names expected to become healthy.
      * @param host Gateway bind address.
      * @param port Gateway bind port.
+     * @param onSyncChannels Callback that writes the app's channel config to the
+     *   engine and binds the channels to the active agent via the gateway config
+     *   API. When null, no channel sync is attempted.
      * @throws CancellationException if the calling coroutine is cancelled.
      */
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("LongParameterList", "TooGenericExceptionCaught")
     suspend fun runHotReload(
         context: Context,
         configToml: String,
         expectedChannels: List<String>,
         host: String = "127.0.0.1",
         port: UShort,
+        onSyncChannels: (suspend () -> Unit)? = null,
     ) {
         _progress.value =
             SetupProgress(
@@ -160,6 +169,7 @@ class SetupOrchestrator(
 
         if (!stepStartDaemon(context, configToml, host, port)) return
         if (!stepAwaitDaemonHealth()) return
+        stepSyncChannels(onSyncChannels)
         stepAwaitChannelsResilient(
             expectedChannels = expectedChannels,
             context = context,
@@ -168,6 +178,28 @@ class SetupOrchestrator(
             onDisableChannel = null,
             onRebuildToml = null,
         )
+    }
+
+    /**
+     * Applies the app's channel configuration and agent bindings to the engine.
+     *
+     * Runs after the daemon is healthy and before channel health is polled, so
+     * the engine sees the bindings when it (re)evaluates listeners. Failures are
+     * logged and swallowed: the Doctor reports channel problems, and a channel
+     * sync failure must not abort setup.
+     *
+     * @param onSyncChannels Callback performing the sync, or null to skip.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun stepSyncChannels(onSyncChannels: (suspend () -> Unit)?) {
+        if (onSyncChannels == null) return
+        try {
+            onSyncChannels()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Channel sync failed (non-fatal): ${e.message}")
+        }
     }
 
     /**

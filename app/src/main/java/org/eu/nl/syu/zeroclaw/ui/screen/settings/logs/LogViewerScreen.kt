@@ -158,9 +158,13 @@ fun LogViewerScreen(
 
         val listState = rememberLazyListState()
 
-        LaunchedEffect(entries.size) {
+        // Entries are newest-first (DAO orders by timestamp DESC), so the most
+        // recent entry is index 0. Scroll there on each change; otherwise the
+        // viewport stays anchored to the oldest entry and new logs arrive
+        // off-screen at the top.
+        LaunchedEffect(entries.size, entries.firstOrNull()?.id) {
             if (entries.isNotEmpty()) {
-                listState.animateScrollToItem(entries.lastIndex)
+                listState.animateScrollToItem(0)
             }
         }
 

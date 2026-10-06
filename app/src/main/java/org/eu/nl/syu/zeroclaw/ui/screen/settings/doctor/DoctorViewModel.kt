@@ -12,12 +12,15 @@ import androidx.lifecycle.viewModelScope
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ApiKey
 import org.eu.nl.syu.zeroclaw.model.AppSettings
+import org.eu.nl.syu.zeroclaw.model.CheckStatus
 import org.eu.nl.syu.zeroclaw.model.DiagnosticCheck
 import org.eu.nl.syu.zeroclaw.model.DoctorSummary
+import org.eu.nl.syu.zeroclaw.model.LogSeverity
 import org.eu.nl.syu.zeroclaw.service.AgentTomlEntry
 import org.eu.nl.syu.zeroclaw.service.ConfigTomlBuilder
 import org.eu.nl.syu.zeroclaw.service.DoctorValidator
 import org.eu.nl.syu.zeroclaw.service.GlobalTomlConfig
+import org.eu.nl.syu.zeroclaw.util.LogSanitizer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -105,10 +108,12 @@ class DoctorViewModel(
                 )
             accumulated.addAll(channelChecks)
             _checks.value = accumulated.toList()
+            logDiagnosticProblems(channelChecks, CHANNEL_LOG_TAG)
 
             val traceChecks = validator.runTraceChecks()
             accumulated.addAll(traceChecks)
             _checks.value = accumulated.toList()
+            logDiagnosticProblems(traceChecks, TRACE_LOG_TAG)
 
             val systemChecks = validator.runSystemChecks()
             accumulated.addAll(systemChecks)
@@ -116,6 +121,34 @@ class DoctorViewModel(
 
             _summary.value = DoctorSummary.from(accumulated)
             _isRunning.value = false
+        }
+    }
+
+    /**
+     * Mirrors non-passing diagnostics into the app log stream.
+     *
+     * The engine reports channel problems through `/api/channels` and
+     * `/api/health`, and runtime errors through `/api/logs`; neither is part of
+     * the app's own log output. Without this, a channel that is offline or an
+     * engine-side failure leaves no trace in the Logs screen. Failures are
+     * logged as errors, warnings as warnings.
+     *
+     * @param checks Diagnostic results to mirror.
+     * @param tag Log tag identifying the diagnostic source.
+     */
+    private fun logDiagnosticProblems(
+        checks: List<DiagnosticCheck>,
+        tag: String,
+    ) {
+        checks.forEach { check ->
+            val message = LogSanitizer.sanitizeLogMessage("${check.title}: ${check.detail}")
+            when (check.status) {
+                CheckStatus.FAIL ->
+                    app.logRepository.append(LogSeverity.ERROR, tag, message)
+                CheckStatus.WARN ->
+                    app.logRepository.append(LogSeverity.WARN, tag, message)
+                else -> Unit
+            }
         }
     }
 
@@ -345,6 +378,15 @@ class DoctorViewModel(
                     )
                 }
         return ConfigTomlBuilder.buildAgentsToml(entries)
+    }
+
+    /** Constants for [DoctorViewModel]. */
+    private companion object {
+        /** Log tag for channel diagnostics mirrored into the log stream. */
+        private const val CHANNEL_LOG_TAG = "Doctor"
+
+        /** Log tag for engine runtime-trace errors mirrored into the log stream. */
+        private const val TRACE_LOG_TAG = "Engine"
     }
 }
 

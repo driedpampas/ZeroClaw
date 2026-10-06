@@ -134,6 +134,9 @@ class SetupViewModel(
             onRebuildToml = {
                 buildConfigToml(effectiveSettings, apiKey, apiKeyBytes, secretBuffers)
             },
+            onSyncChannels = {
+                daemonBridge.syncChannels(app.channelConfigRepository.getEnabledWithSecrets())
+            },
         )
     }
 
