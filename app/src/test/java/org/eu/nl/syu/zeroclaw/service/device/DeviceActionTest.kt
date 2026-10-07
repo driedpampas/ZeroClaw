@@ -63,6 +63,32 @@ class DeviceActionTest {
     }
 
     @Test
+    @DisplayName("parses canonical tool names")
+    fun `parses canonical tool names`() {
+        assertEquals(
+            DeviceAction.Tap(5, 6),
+            DeviceAction.parse("{\"action\":\"screen_tap\",\"x\":5,\"y\":6}"),
+        )
+        assertEquals(
+            DeviceAction.Global(DeviceAction.GLOBAL_ACTION_HOME),
+            DeviceAction.parse("{\"action\":\"press_home\"}"),
+        )
+        assertEquals(
+            DeviceAction.OpenApp("com.example.app"),
+            DeviceAction.parse("{\"action\":\"open_app\",\"package\":\"com.example.app\"}"),
+        )
+        assertEquals(
+            DeviceAction.ListApps("maps"),
+            DeviceAction.parse("{\"action\":\"list_apps\",\"query\":\"maps\"}"),
+        )
+        assertEquals(
+            DeviceAction.ListApps(null),
+            DeviceAction.parse("{\"action\":\"list_apps\"}"),
+        )
+        assertEquals(DeviceAction.NoOp, DeviceAction.parse("{\"action\":\"open_app\"}"))
+    }
+
+    @Test
     @DisplayName("malformed input yields NoOp instead of throwing")
     fun `malformed input yields NoOp`() {
         assertEquals(DeviceAction.NoOp, DeviceAction.parse("not json"))
@@ -89,6 +115,8 @@ class DeviceActionTest {
                 DeviceAction.Type("secret-text"),
                 DeviceAction.ClickNode(null, "secret-label"),
                 DeviceAction.Global(1),
+                DeviceAction.OpenApp("com.secret.app"),
+                DeviceAction.ListApps("secret-query"),
                 DeviceAction.Finish("summary"),
                 DeviceAction.NoOp,
             )
@@ -100,7 +128,7 @@ class DeviceActionTest {
     }
 
     @Test
-    @DisplayName("fromAction maps gestures and skips NoOp and Finish")
+    @DisplayName("fromAction maps gestures and skips non-gesture actions")
     fun `fromAction maps gestures`() {
         assertEquals(DeviceCommand.Type.TAP, DeviceCommand.fromAction(DeviceAction.Tap(1, 2))?.type)
         assertEquals(DeviceCommand.Type.SWIPE, DeviceCommand.fromAction(DeviceAction.Swipe(1, 2, 3, 4))?.type)
@@ -110,5 +138,7 @@ class DeviceActionTest {
         )
         assertNull(DeviceCommand.fromAction(DeviceAction.NoOp))
         assertNull(DeviceCommand.fromAction(DeviceAction.Finish()))
+        assertNull(DeviceCommand.fromAction(DeviceAction.OpenApp("com.example.app")))
+        assertNull(DeviceCommand.fromAction(DeviceAction.ListApps(null)))
     }
 }

@@ -11,6 +11,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.eu.nl.syu.zeroclaw.service.device.tools.DeviceToolExecutor
+import org.eu.nl.syu.zeroclaw.service.device.tools.ToolOutcome
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -60,28 +62,34 @@ class DeviceAgentControllerTest {
             val n = if (fixedScreen) 0 else screenSeq.incrementAndGet()
             UiSnapshot("screen-$n", "hash-$n")
         }
-        useUngatedActor()
+        useUngatedExecutor()
         DeviceAgentController.reasoner =
-            DeviceReasoner { _, _, step ->
-                script.getOrElse(step) { DeviceAction.NoOp }
+            DeviceReasoner { input ->
+                script.getOrElse(input.step) { DeviceAction.NoOp }
             }
     }
 
-    /** Act hook that runs without blocking (for run-to-terminal tests). */
-    private fun useUngatedActor() {
-        DeviceAgentController.actor = {
-            actCount.incrementAndGet()
-            true
-        }
+    /** Executor fake that runs without blocking (for run-to-terminal tests). */
+    private fun useUngatedExecutor() {
+        DeviceAgentController.toolExecutor =
+            object : DeviceToolExecutor {
+                override suspend fun execute(action: DeviceAction): ToolOutcome {
+                    actCount.incrementAndGet()
+                    return ToolOutcome(true)
+                }
+            }
     }
 
-    /** Act hook that blocks each step until [releaseStep] is called. */
-    private fun useGatedActor() {
-        DeviceAgentController.actor = {
-            actCount.incrementAndGet()
-            stepGate.receive()
-            true
-        }
+    /** Executor fake that blocks each step until [releaseStep] is called. */
+    private fun useGatedExecutor() {
+        DeviceAgentController.toolExecutor =
+            object : DeviceToolExecutor {
+                override suspend fun execute(action: DeviceAction): ToolOutcome {
+                    actCount.incrementAndGet()
+                    stepGate.receive()
+                    return ToolOutcome(true)
+                }
+            }
     }
 
     /** Lets one blocked Act step proceed. */
@@ -139,7 +147,7 @@ class DeviceAgentControllerTest {
     @Test
     @DisplayName("pause parks the loop and resume re-reads the screen")
     fun `pause parks and resume re-reads`() {
-        useGatedActor()
+        useGatedExecutor()
         script =
             listOf(
                 DeviceAction.Tap(1, 1),
@@ -178,7 +186,7 @@ class DeviceAgentControllerTest {
     @Test
     @DisplayName("stop while paused terminates without looping")
     fun `stop while paused terminates`() {
-        useGatedActor()
+        useGatedExecutor()
         script = listOf(DeviceAction.Tap(1, 1), DeviceAction.Tap(2, 2))
         runBlocking {
             withTimeout(TEST_TIMEOUT_MS) {
@@ -201,7 +209,7 @@ class DeviceAgentControllerTest {
         DeviceAgentController.requestPause()
         assertEquals(DeviceAgentState.IDLE, DeviceAgentController.state.value)
 
-        useGatedActor()
+        useGatedExecutor()
         script = listOf(DeviceAction.Tap(1, 1), DeviceAction.Finish("done"))
         runBlocking {
             withTimeout(TEST_TIMEOUT_MS) {
@@ -217,6 +225,88 @@ class DeviceAgentControllerTest {
                 awaitState(DeviceAgentState.DONE)
             }
         }
+    }
+
+    @Test
+    @DisplayName("pause parks the loop on the latch without perceiving")
+    fun `pause parks on latch`() {
+        val perceiveGate = Channel<Unit>(Channel.UNLIMITED)
+        DeviceAgentController.perceiver = {
+            perceiveCount.incrementAndGet()
+            perceiveGate.receive()
+            val n = screenSeq.incrementAndGet()
+            UiSnapshot("screen-$n", "hash-$n")
+        }
+        DeviceAgentController.reasoner = DeviceReasoner { DeviceAction.Finish("done") }
+        runBlocking {
+            withTimeout(TEST_TIMEOUT_MS) {
+                DeviceAgentController.start("goal", maxSteps = 10, scope = this)
+                awaitCount(perceiveCount, 1)
+                DeviceAgentController.requestPause(DeviceAgentController.REASON_USER_TOUCH)
+                awaitState(DeviceAgentState.PAUSED)
+                // Let the gated perceive complete; the loop must now park
+                // on the pause latch instead of progressing.
+                perceiveGate.send(Unit)
+                delay(PARKED_OBSERVE_MS)
+                assertEquals(DeviceAgentState.PAUSED, DeviceAgentController.state.value)
+                assertEquals(0, DeviceAgentController.stepsExecuted)
+                assertEquals(1, perceiveCount.get())
+                DeviceAgentController.resume()
+                awaitState(DeviceAgentState.DONE)
+            }
+        }
+        assertFalse(DeviceAgentController.isPaused)
+    }
+
+    @Test
+    @DisplayName("tool observations reach the next Reason step")
+    fun `observation reaches reason`() {
+        val seen = mutableListOf<ReasonInput>()
+        DeviceAgentController.toolExecutor =
+            object : DeviceToolExecutor {
+                override suspend fun execute(action: DeviceAction): ToolOutcome {
+                    actCount.incrementAndGet()
+                    return if (action is DeviceAction.ListApps) {
+                        ToolOutcome(true, "OBS-apps")
+                    } else {
+                        ToolOutcome(true)
+                    }
+                }
+            }
+        DeviceAgentController.reasoner =
+            DeviceReasoner { input ->
+                seen.add(input)
+                if (input.step == 0) DeviceAction.ListApps(null) else DeviceAction.Finish("done")
+            }
+        runBlocking {
+            withTimeout(TEST_TIMEOUT_MS) {
+                DeviceAgentController.start("goal", maxSteps = 10, scope = this)
+                awaitState(DeviceAgentState.DONE)
+            }
+        }
+        assertTrue(seen.size >= 2)
+        assertEquals(null, seen[0].observation)
+        assertEquals("OBS-apps", seen[1].observation)
+    }
+
+    @Test
+    @DisplayName("accessibility revocation fails the task without hanging")
+    fun `revocation fails task`() {
+        useGatedExecutor()
+        script = listOf(DeviceAction.Tap(1, 1), DeviceAction.Tap(2, 2))
+        runBlocking {
+            withTimeout(TEST_TIMEOUT_MS) {
+                DeviceAgentController.start("goal", maxSteps = 50, scope = this)
+                awaitCount(actCount, 1)
+                DeviceAgentController.requestPause()
+                awaitState(DeviceAgentState.PAUSED)
+                DeviceAgentController.onAccessibilityLost()
+                awaitState(DeviceAgentState.ERROR)
+                delay(PARKED_OBSERVE_MS)
+                assertEquals(DeviceAgentState.ERROR, DeviceAgentController.state.value)
+            }
+        }
+        assertFalse(DeviceAgentController.isPaused)
     }
 
     private suspend fun awaitCount(

@@ -6,6 +6,25 @@
 
 package org.eu.nl.syu.zeroclaw.service.device
 
+import org.eu.nl.syu.zeroclaw.service.device.tools.DeviceToolCatalog
+
+/**
+ * Input for one Reason step.
+ *
+ * @property screen Compact UI-tree text from [UiTreeSerializer].
+ * @property goal Task description supplied at start.
+ * @property step Zero-based loop iteration.
+ * @property observation Optional output of the previous tool
+ *   (e.g. a `list_apps` listing); null when the last tool returned
+ *   no data.
+ */
+data class ReasonInput(
+    val screen: String,
+    val goal: String,
+    val step: Int,
+    val observation: String? = null,
+)
+
 /**
  * Reason step of the Perceive → Reason → Act loop.
  *
@@ -18,19 +37,13 @@ package org.eu.nl.syu.zeroclaw.service.device
  */
 fun interface DeviceReasoner {
     /**
-     * Chooses the next action for [goal] given the current screen.
+     * Chooses the next action for [ReasonInput.goal] given the current screen.
      *
-     * @param screen Compact UI-tree text from [UiTreeSerializer].
-     * @param goal Task description supplied at start.
-     * @param step Zero-based loop iteration.
+     * @param input Screen, goal, step, and previous tool observation.
      * @return Next action. Implementations must never throw for
      *   malformed model output — return [DeviceAction.NoOp].
      */
-    suspend fun reason(
-        screen: String,
-        goal: String,
-        step: Int,
-    ): DeviceAction
+    suspend fun reason(input: ReasonInput): DeviceAction
 }
 
 /**
@@ -45,14 +58,10 @@ fun interface DeviceReasoner {
 class GatewayDeviceReasoner(
     private val chat: suspend (prompt: String) -> String,
 ) : DeviceReasoner {
-    override suspend fun reason(
-        screen: String,
-        goal: String,
-        step: Int,
-    ): DeviceAction {
+    override suspend fun reason(input: ReasonInput): DeviceAction {
         val response =
             try {
-                chat(buildPrompt(goal, screen, step))
+                chat(buildPrompt(input.goal, input.screen, input.step, input.observation))
             } catch (_: Exception) {
                 return DeviceAction.NoOp
             }
@@ -60,17 +69,20 @@ class GatewayDeviceReasoner(
     }
 
     /**
-     * Builds the Reason prompt: goal, compact screen, and action schema.
+     * Builds the Reason prompt: goal, compact screen, tool catalog, and
+     * the previous tool's observation when present.
      *
      * @param goal Task description.
      * @param screen Compact UI-tree text.
      * @param step Zero-based iteration (for step-budget awareness).
+     * @param observation Previous data-returning tool output, if any.
      * @return Prompt string for the LLM.
      */
     fun buildPrompt(
         goal: String,
         screen: String,
         step: Int,
+        observation: String? = null,
     ): String =
         buildString {
             append("You control an Android phone. Goal: ")
@@ -79,8 +91,13 @@ class GatewayDeviceReasoner(
             append(step)
             append("\nCurrent screen:\n")
             append(screen.take(MAX_SCREEN_CHARS))
-            append("\nReply with ONE JSON action only, no other text. Schema:\n")
-            append(ACTION_SCHEMA)
+            append("\n")
+            if (!observation.isNullOrBlank()) {
+                append("Last tool output:\n")
+                append(observation.take(MAX_OBSERVATION_CHARS))
+                append("\n")
+            }
+            append(DeviceToolCatalog.promptSection())
         }
 
     private fun extractJson(response: String): String {
@@ -90,18 +107,12 @@ class GatewayDeviceReasoner(
         return response.substring(start, end + 1)
     }
 
-    /** Prompt constants for the gateway-backed reasoner. */
+    /** Prompt size caps for the gateway-backed reasoner. */
     companion object {
         /** Max screen characters included in the prompt. */
         const val MAX_SCREEN_CHARS = 8_000
 
-        /** Action schema advertised to the model. */
-        const val ACTION_SCHEMA =
-            "{\"action\":\"tap\",\"x\":100,\"y\":200} | " +
-                "{\"action\":\"swipe\",\"x1\":100,\"y1\":500,\"x2\":100,\"y2\":200} | " +
-                "{\"action\":\"type\",\"text\":\"hello\"} | " +
-                "{\"action\":\"click\",\"resource_id\":\"com.app:id/btn\"} | " +
-                "{\"action\":\"back\"|\"home\"|\"recents\"} | " +
-                "{\"action\":\"finish\",\"summary\":\"done\"}"
+        /** Max observation characters included in the prompt. */
+        const val MAX_OBSERVATION_CHARS = 2_000
     }
 }

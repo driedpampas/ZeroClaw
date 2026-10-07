@@ -12,6 +12,9 @@ import android.util.Log
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Singleton bridge between the agent loop and [ZeroClawAccessibilityService].
@@ -30,6 +33,17 @@ object DeviceControlBridge {
     @Volatile
     private var serviceInstance: ZeroClawAccessibilityService? = null
 
+    private val _connected = MutableStateFlow(false)
+
+    /**
+     * Whether the accessibility service is connected.
+     *
+     * Observed by the UI so the enable-accessibility prompt appears
+     * only while the service is disabled (never enabled, or revoked),
+     * and by the agent service for state transitions.
+     */
+    val connected: StateFlow<Boolean> = _connected.asStateFlow()
+
     /**
      * Called by [ZeroClawAccessibilityService.onServiceConnected].
      *
@@ -37,12 +51,14 @@ object DeviceControlBridge {
      */
     fun register(service: ZeroClawAccessibilityService) {
         serviceInstance = service
+        _connected.value = true
         Log.i(TAG, "Accessibility service registered")
     }
 
     /** Called by [ZeroClawAccessibilityService.onDestroy]. */
     fun unregister() {
         serviceInstance = null
+        _connected.value = false
         Log.i(TAG, "Accessibility service unregistered")
     }
 

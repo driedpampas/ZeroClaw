@@ -64,6 +64,7 @@ class ZeroClawAccessibilityService : AccessibilityService() {
         }
         touchWatcher = null
         DeviceControlBridge.unregister()
+        DeviceAgentController.onAccessibilityLost()
         AgentOverlayManager.hide()
         super.onDestroy()
         Log.i(TAG, "Service destroyed")
@@ -273,16 +274,12 @@ class ZeroClawAccessibilityService : AccessibilityService() {
                 emptyList()
             }
         val className = node.className?.toString()?.substringAfterLast('.')
-        var hint: String? = null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            hint = node.hintText?.toString()
-        }
         return UiNode(
             className = className,
             resourceId = node.viewIdResourceName,
             text = node.text?.toString(),
             contentDescription = node.contentDescription?.toString(),
-            hint = hint,
+            hint = node.hintText?.toString(),
             clickable = node.isClickable,
             scrollable = node.isScrollable,
             editable = node.isEditable,

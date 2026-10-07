@@ -95,6 +95,28 @@ sealed interface DeviceAction {
         override val eventName: String = "ACTION_GLOBAL"
     }
 
+    /**
+     * Opens an installed app via its launcher intent.
+     *
+     * @property packageName Application package (e.g. `com.android.settings`).
+     *   Discovered via [ListApps]; never logged.
+     */
+    data class OpenApp(val packageName: String) : DeviceAction {
+        override val eventName: String = "ACTION_OPEN_APP"
+    }
+
+    /**
+     * Lists launchable apps, optionally filtered by [query].
+     *
+     * The formatted list is returned as an observation for the next
+     * Reason step; the query itself is never logged.
+     *
+     * @property query Case-insensitive label/package filter, or null for all.
+     */
+    data class ListApps(val query: String? = null) : DeviceAction {
+        override val eventName: String = "ACTION_LIST_APPS"
+    }
+
     /** No-op step; advances the loop without touching the screen. */
     data object NoOp : DeviceAction {
         override val eventName: String = "ACTION_NOOP"
@@ -114,12 +136,10 @@ sealed interface DeviceAction {
         /**
          * Parses an LLM-produced JSON action into a [DeviceAction].
          *
-         * Expected shape: `{"action":"tap","x":100,"y":200}`,
-         * `{"action":"swipe","x1":…,"y1":…,"x2":…,"y2":…}`,
-         * `{"action":"type","text":"…"}`, `{"action":"click",…}`,
-         * `{"action":"back"|"home"|"recents"}`, `{"action":"finish"}`,
-         * `{"action":"noop"}`. Unknown or malformed input yields [NoOp]
-         * so the loop keeps its step budget instead of crashing.
+         * The `action` value is a [DeviceToolCatalog] tool name
+         * (`screen_tap`, `press_back`, …); short legacy aliases (`tap`,
+         * `back`, …) are accepted too. Unknown or malformed input yields
+         * [NoOp] so the loop keeps its step budget instead of crashing.
          *
          * @param json Raw LLM response text containing a JSON object.
          * @return Parsed action, or [NoOp] when unparseable.
@@ -131,18 +151,38 @@ sealed interface DeviceAction {
                 } catch (_: JSONException) {
                     return NoOp
                 }
-            return when (obj.optString("action").lowercase()) {
-                "tap" -> parseTap(obj)
-                "swipe" -> parseSwipe(obj)
-                "type" -> parseType(obj)
-                "click" -> parseClick(obj)
-                "back" -> Global(GLOBAL_ACTION_BACK)
-                "home" -> Global(GLOBAL_ACTION_HOME)
-                "recents" -> Global(GLOBAL_ACTION_RECENTS)
+            return when (canonicalName(obj.optString("action"))) {
+                "screen_tap" -> parseTap(obj)
+                "screen_swipe" -> parseSwipe(obj)
+                "screen_type" -> parseType(obj)
+                "screen_click" -> parseClick(obj)
+                "press_back" -> Global(GLOBAL_ACTION_BACK)
+                "press_home" -> Global(GLOBAL_ACTION_HOME)
+                "press_recents" -> Global(GLOBAL_ACTION_RECENTS)
+                "open_app" -> parseOpenApp(obj)
+                "list_apps" -> parseListApps(obj)
                 "finish" -> Finish(obj.optString("summary", ""))
                 else -> NoOp
             }
         }
+
+        /**
+         * Maps legacy short aliases to canonical tool names.
+         *
+         * @param raw Raw `action` value from the model.
+         * @return Canonical tool name.
+         */
+        private fun canonicalName(raw: String): String =
+            when (raw.lowercase()) {
+                "tap" -> "screen_tap"
+                "swipe" -> "screen_swipe"
+                "type" -> "screen_type"
+                "click" -> "screen_click"
+                "back" -> "press_back"
+                "home" -> "press_home"
+                "recents" -> "press_recents"
+                else -> raw.lowercase()
+            }
 
         private fun parseTap(obj: JSONObject): DeviceAction {
             if (!obj.has("x") || !obj.has("y")) return NoOp
@@ -172,6 +212,17 @@ sealed interface DeviceAction {
             val text = obj.optString("text", "").takeIf { it.isNotBlank() }
             if (rid == null && text == null) return NoOp
             return ClickNode(rid, text)
+        }
+
+        private fun parseOpenApp(obj: JSONObject): DeviceAction {
+            val pkg = obj.optString("package", "").trim()
+            if (pkg.isEmpty()) return NoOp
+            return OpenApp(pkg)
+        }
+
+        private fun parseListApps(obj: JSONObject): DeviceAction {
+            val query = obj.optString("query", "").takeIf { it.isNotBlank() }
+            return ListApps(query)
         }
 
         /** Mirrors `AccessibilityService.GLOBAL_ACTION_BACK` (= 1). */

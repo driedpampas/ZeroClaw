@@ -108,10 +108,10 @@ data class DeviceCommand private constructor(
         /**
          * Maps an LLM-level [DeviceAction] to an executor-level command.
          *
-         * @return `null` for [DeviceAction.NoOp] and [DeviceAction.Finish],
-         *   which require no gesture dispatch.
+         * @return `null` for [DeviceAction.NoOp], [DeviceAction.Finish],
+         *   [DeviceAction.OpenApp], and [DeviceAction.ListApps], which need
+         *   no gesture dispatch (handled by the tool executor instead).
          */
-        @Suppress("ReturnCount")
         fun fromAction(action: DeviceAction): DeviceCommand? =
             when (action) {
                 is DeviceAction.Tap -> tapAt(action.x, action.y)
@@ -120,7 +120,11 @@ data class DeviceCommand private constructor(
                 is DeviceAction.Type -> setText(action.text, action.resourceId)
                 is DeviceAction.ClickNode -> clickNode(action.resourceId, action.text)
                 is DeviceAction.Global -> globalAction(action.actionId)
-                DeviceAction.NoOp, is DeviceAction.Finish -> null
+                DeviceAction.NoOp,
+                is DeviceAction.Finish,
+                is DeviceAction.OpenApp,
+                is DeviceAction.ListApps,
+                -> null
             }
     }
 }

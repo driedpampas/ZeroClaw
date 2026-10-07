@@ -44,18 +44,18 @@ import org.eu.nl.syu.zeroclaw.service.device.DeviceControlBridge
 /**
  * Dashboard card for the on-device accessibility agent.
  *
- * Self-contained: it collects [DeviceAgentController.state] directly and
- * drives [DeviceAgentService] via intents, so no [DashboardState] changes
- * are required. Shows an accessibility-setup prompt when
- * [DeviceControlBridge] is disconnected, a goal field with a Start button
- * when idle, Pause/Resume controls while running, and a Resume button
- * when paused (mirroring the notification Resume action).
+ * Self-contained: it collects [DeviceAgentController.state] and
+ * [DeviceControlBridge.connected] directly and drives
+ * [DeviceAgentService] via intents, so no [DashboardState] changes are
+ * required. The enable-accessibility prompt appears only while the
+ * service is disabled — on first setup or after a system revocation —
+ * and hides automatically once the service connects.
  */
 @Composable
 fun DeviceControlCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val agentState by DeviceAgentController.state.collectAsStateWithLifecycle()
-    val connected = remember(agentState) { DeviceControlBridge.isConnected() }
+    val connected by DeviceControlBridge.connected.collectAsStateWithLifecycle()
     var goal by remember { mutableStateOf("") }
 
     Card(
@@ -75,141 +75,189 @@ fun DeviceControlCard(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = deviceAgentStatusText(agentState, connected),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
 
             if (!connected) {
-                TextButton(
-                    onClick = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            },
-                        )
-                    },
-                    modifier =
-                        Modifier
-                            .defaultMinSize(minHeight = 48.dp)
-                            .semantics {
-                                contentDescription = "Open accessibility settings"
-                            },
-                ) {
-                    Text("Enable in Accessibility settings")
-                }
-                return@Column
+                EnableAccessibilityBox()
+            } else {
+                AgentControls(
+                    agentState = agentState,
+                    goal = goal,
+                    onGoalChange = { goal = it },
+                )
             }
+        }
+    }
+}
 
-            when (agentState) {
-                DeviceAgentState.IDLE,
-                DeviceAgentState.DONE,
-                DeviceAgentState.STUCK,
-                DeviceAgentState.ERROR,
-                -> {
-                    OutlinedTextField(
-                        value = goal,
-                        onValueChange = { goal = it },
-                        label = { Text("Agent task") },
-                        placeholder = { Text("e.g. Open Settings and turn on Wi-Fi") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                val startIntent =
-                                    Intent(context, DeviceAgentService::class.java).apply {
-                                        action = DeviceAgentService.ACTION_START
-                                        putExtra(DeviceAgentService.EXTRA_GOAL, goal)
-                                    }
-                                context.startForegroundService(startIntent)
-                            },
-                            enabled = goal.isNotBlank(),
-                            modifier =
-                                Modifier
-                                    .defaultMinSize(minHeight = 48.dp)
-                                    .semantics {
-                                        contentDescription = "Start agent task"
-                                    },
-                        ) {
-                            Text("Start agent task")
-                        }
+/**
+ * Enable prompt shown only while the accessibility service is disabled.
+ *
+ * @param modifier Modifier applied to the prompt column.
+ */
+@Composable
+private fun EnableAccessibilityBox(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Column(modifier = modifier) {
+        Text(
+            text =
+                "The on-device agent needs the ZeroClaw accessibility " +
+                    "service to read the screen and tap, swipe, and type. " +
+                    "If you did not turn it off, the system may have " +
+                    "revoked it — re-enable it here.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        TextButton(
+            onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                )
+            },
+            modifier =
+                Modifier
+                    .defaultMinSize(minHeight = 48.dp)
+                    .semantics {
+                        contentDescription = "Open accessibility settings"
+                    },
+        ) {
+            Text("Enable in Accessibility settings")
+        }
+    }
+}
+
+/**
+ * Task controls shown while the accessibility service is connected.
+ *
+ * @param agentState Current agent lifecycle state.
+ * @param goal Task description draft.
+ * @param onGoalChange Callback for goal edits.
+ * @param modifier Modifier applied to the controls column.
+ */
+@Composable
+private fun AgentControls(
+    agentState: DeviceAgentState,
+    goal: String,
+    onGoalChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    Column(modifier = modifier) {
+        Text(
+            text = deviceAgentStatusText(agentState),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when (agentState) {
+            DeviceAgentState.IDLE,
+            DeviceAgentState.DONE,
+            DeviceAgentState.STUCK,
+            DeviceAgentState.ERROR,
+            -> {
+                OutlinedTextField(
+                    value = goal,
+                    onValueChange = onGoalChange,
+                    label = { Text("Agent task") },
+                    placeholder = { Text("e.g. Open Settings and turn on Wi-Fi") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = {
+                            val startIntent =
+                                Intent(context, DeviceAgentService::class.java).apply {
+                                    action = DeviceAgentService.ACTION_START
+                                    putExtra(DeviceAgentService.EXTRA_GOAL, goal)
+                                }
+                            context.startForegroundService(startIntent)
+                        },
+                        enabled = goal.isNotBlank(),
+                        modifier =
+                            Modifier
+                                .defaultMinSize(minHeight = 48.dp)
+                                .semantics {
+                                    contentDescription = "Start agent task"
+                                },
+                    ) {
+                        Text("Start agent task")
                     }
                 }
-                DeviceAgentState.ACTIVE -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                context.startService(
-                                    Intent(context, DeviceAgentService::class.java).apply {
-                                        action = DeviceAgentService.ACTION_PAUSE
-                                    },
-                                )
-                            },
-                            modifier =
-                                Modifier
-                                    .defaultMinSize(minHeight = 48.dp)
-                                    .semantics {
-                                        contentDescription = "Pause agent"
-                                    },
-                        ) {
-                            Text("Pause agent")
-                        }
-                        TextButton(
-                            onClick = {
-                                context.startService(
-                                    Intent(context, DeviceAgentService::class.java).apply {
-                                        action = DeviceAgentService.ACTION_STOP
-                                    },
-                                )
-                            },
-                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                        ) {
-                            Text("Stop agent")
-                        }
+            }
+            DeviceAgentState.ACTIVE -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = {
+                            context.startService(
+                                Intent(context, DeviceAgentService::class.java).apply {
+                                    action = DeviceAgentService.ACTION_PAUSE
+                                },
+                            )
+                        },
+                        modifier =
+                            Modifier
+                                .defaultMinSize(minHeight = 48.dp)
+                                .semantics {
+                                    contentDescription = "Pause agent"
+                                },
+                    ) {
+                        Text("Pause agent")
+                    }
+                    TextButton(
+                        onClick = {
+                            context.startService(
+                                Intent(context, DeviceAgentService::class.java).apply {
+                                    action = DeviceAgentService.ACTION_STOP
+                                },
+                            )
+                        },
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                    ) {
+                        Text("Stop agent")
                     }
                 }
-                DeviceAgentState.PAUSED -> {
-                    Text(
-                        text = "Paused — the screen may have changed. Resume re-reads it.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                context.startService(
-                                    Intent(context, DeviceAgentService::class.java).apply {
-                                        action = DeviceAgentService.ACTION_RESUME
-                                    },
-                                )
-                            },
-                            modifier =
-                                Modifier
-                                    .defaultMinSize(minHeight = 48.dp)
-                                    .semantics {
-                                        contentDescription = "Resume agent"
-                                    },
-                        ) {
-                            Text("Resume agent")
-                        }
-                        TextButton(
-                            onClick = {
-                                context.startService(
-                                    Intent(context, DeviceAgentService::class.java).apply {
-                                        action = DeviceAgentService.ACTION_STOP
-                                    },
-                                )
-                            },
-                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                        ) {
-                            Text("Stop agent")
-                        }
+            }
+            DeviceAgentState.PAUSED -> {
+                Text(
+                    text = "Paused — the screen may have changed. Resume re-reads it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = {
+                            context.startService(
+                                Intent(context, DeviceAgentService::class.java).apply {
+                                    action = DeviceAgentService.ACTION_RESUME
+                                },
+                            )
+                        },
+                        modifier =
+                            Modifier
+                                .defaultMinSize(minHeight = 48.dp)
+                                .semantics {
+                                    contentDescription = "Resume agent"
+                                },
+                    ) {
+                        Text("Resume agent")
+                    }
+                    TextButton(
+                        onClick = {
+                            context.startService(
+                                Intent(context, DeviceAgentService::class.java).apply {
+                                    action = DeviceAgentService.ACTION_STOP
+                                },
+                            )
+                        },
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                    ) {
+                        Text("Stop agent")
                     }
                 }
             }
@@ -217,16 +265,12 @@ fun DeviceControlCard(modifier: Modifier = Modifier) {
     }
 }
 
-private fun deviceAgentStatusText(
-    state: DeviceAgentState,
-    connected: Boolean,
-): String =
-    when {
-        !connected -> "Requires the ZeroClaw accessibility service."
-        state == DeviceAgentState.ACTIVE -> "Running — touching the screen pauses it."
-        state == DeviceAgentState.PAUSED -> "Paused — tap Resume to continue."
-        state == DeviceAgentState.DONE -> "Last task finished."
-        state == DeviceAgentState.STUCK -> "Last task stopped (no progress)."
-        state == DeviceAgentState.ERROR -> "Last task hit an error."
-        else -> "Idle. The border appears while running."
+private fun deviceAgentStatusText(state: DeviceAgentState): String =
+    when (state) {
+        DeviceAgentState.ACTIVE -> "Running — touching the screen pauses it."
+        DeviceAgentState.PAUSED -> "Paused — tap Resume to continue."
+        DeviceAgentState.DONE -> "Last task finished."
+        DeviceAgentState.STUCK -> "Last task stopped (no progress)."
+        DeviceAgentState.ERROR -> "Last task hit an error."
+        DeviceAgentState.IDLE -> "Idle. The border appears while running."
     }

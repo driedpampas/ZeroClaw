@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.service.device.tools.BridgeDeviceToolExecutor
+import org.eu.nl.syu.zeroclaw.service.device.tools.DeviceToolExecutor
+import org.eu.nl.syu.zeroclaw.service.device.tools.ToolOutcome
 
 /**
  * Compact screen snapshot for one Perceive step.
@@ -42,7 +45,12 @@ data class UiSnapshot(
  * - Perceive via [DeviceControlBridge] UI-tree reads.
  * - Reason via the injected [DeviceReasoner] (default: [GatewayDeviceReasoner]
  *   over ZeroClaw's existing LLM provider layer).
- * - Act via [DeviceControlBridge] gesture dispatch.
+ * - Act via the injected [DeviceToolExecutor] (gestures through the
+ *   bridge, app tools through the package manager; tool definitions in
+ *   the device tools catalog).
+ *
+ * Data-returning tools (`list_apps`) feed an observation into the next
+ * Reason step; gestures never produce observations.
  *
  * Pause handling: [requestPause] flips a `@Volatile` flag checked at the
  * top of every iteration and immediately before gesture dispatch. While
@@ -76,6 +84,9 @@ object DeviceAgentController {
 
     /** Pause reason for explicit pause requests. */
     const val REASON_EXPLICIT = "explicit"
+
+    /** Task error detail when the accessibility service is revoked. */
+    const val REASON_SERVICE_DISCONNECTED = "service_disconnected"
 
     private val _state = MutableStateFlow(DeviceAgentState.IDLE)
     private val _events = MutableSharedFlow<DeviceEvent>(extraBufferCapacity = 32)
@@ -116,13 +127,16 @@ object DeviceAgentController {
     @Volatile
     var perceiver: suspend () -> UiSnapshot = { livePerceive() }
 
-    /** Act hook; defaults to live gesture dispatch. */
+    /**
+     * Act hook; defaults to gesture-only bridge dispatch until
+     * [DeviceAgentService] installs the full Android executor.
+     */
     @Volatile
-    var actor: suspend (DeviceAction) -> Boolean = { liveAct(it) }
+    var toolExecutor: DeviceToolExecutor = BridgeDeviceToolExecutor
 
     /** Reason hook; replaced by tests with scripted actions. */
     @Volatile
-    var reasoner: DeviceReasoner = DeviceReasoner { _, _, _ -> DeviceAction.NoOp }
+    var reasoner: DeviceReasoner = DeviceReasoner { DeviceAction.NoOp }
 
     /**
      * Starts a task in the background.
@@ -225,6 +239,31 @@ object DeviceAgentController {
     }
 
     /**
+     * Handles accessibility-service revocation mid-task.
+     *
+     * Called from [ZeroClawAccessibilityService.onDestroy]. When a task
+     * is [DeviceAgentState.ACTIVE] or [DeviceAgentState.PAUSED], the loop
+     * is cancelled and the state moves to [DeviceAgentState.ERROR] with
+     * a structured `TASK_ERROR` (never retried: perceives would fail
+     * forever without the service). No-op when idle or already terminal.
+     */
+    fun onAccessibilityLost() {
+        synchronized(pauseLock) {
+            val current = _state.value
+            if (current != DeviceAgentState.ACTIVE && current != DeviceAgentState.PAUSED) return
+            stopRequested = true
+            isPaused = false
+            pauseLatch?.countDown()
+            pauseLatch = null
+            loopJob?.cancel()
+            loopJob = null
+            _state.value = DeviceAgentState.ERROR
+        }
+        emit(DeviceEvent.TaskError(REASON_SERVICE_DISCONNECTED))
+        Log.i(TAG, "TASK_ERROR detail=$REASON_SERVICE_DISCONNECTED")
+    }
+
+    /**
      * Resets hooks and state for tests.
      *
      * Must only be called from unit tests when no task is running.
@@ -239,8 +278,8 @@ object DeviceAgentController {
             pauseLatch = null
             _state.value = DeviceAgentState.IDLE
             perceiver = { UiSnapshot("", "empty") }
-            actor = { true }
-            reasoner = DeviceReasoner { _, _, _ -> DeviceAction.NoOp }
+            toolExecutor = BridgeDeviceToolExecutor
+            reasoner = DeviceReasoner { DeviceAction.NoOp }
         }
         // Drain stale events best-effort; replay cache is absent so
         // collectors only see events emitted after (re)subscription.
@@ -250,10 +289,10 @@ object DeviceAgentController {
         goal: String,
         maxSteps: Int,
     ) {
-        val tracker = SameScreenTracker()
+        val progress = LoopProgress()
         try {
             while (stepsExecuted < maxSteps && !stopRequested) {
-                if (!runOneIteration(goal, tracker)) return
+                if (!runOneIteration(goal, progress)) return
             }
             if (!stopRequested && _state.value == DeviceAgentState.ACTIVE) {
                 markStuck()
@@ -279,17 +318,20 @@ object DeviceAgentController {
     @Suppress("ReturnCount")
     private suspend fun runOneIteration(
         goal: String,
-        tracker: SameScreenTracker,
+        progress: LoopProgress,
     ): Boolean {
         awaitIfPaused()
         if (stopRequested) return false
         val snapshot = perceiveOrFail() ?: return false
         if (stopRequested) return false
-        if (tracker.isStuck(snapshot.hash)) {
+        if (progress.tracker.isStuck(snapshot.hash)) {
             markStuck()
             return false
         }
-        val action = reasonOrNoOp(snapshot.serialized, goal)
+        val observation = progress.pendingObservation
+        progress.pendingObservation = null
+        val input = ReasonInput(snapshot.serialized, goal, stepsExecuted, observation)
+        val action = reasonOrNoOp(input)
         // Pause checkpoint before dispatching the next gesture: a gesture
         // already in flight completes, but no new gesture starts while
         // paused.
@@ -299,7 +341,8 @@ object DeviceAgentController {
             markDone()
             return false
         }
-        dispatch(action)
+        val outcome = dispatch(action)
+        progress.pendingObservation = outcome.observation
         stepsExecuted++
         return true
     }
@@ -322,31 +365,28 @@ object DeviceAgentController {
     /** Reasons the next action; degrades to [DeviceAction.NoOp]. */
     // Model output handling must never throw; malformed responses become no-ops.
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun reasonOrNoOp(
-        screen: String,
-        goal: String,
-    ): DeviceAction =
+    private suspend fun reasonOrNoOp(input: ReasonInput): DeviceAction =
         try {
-            reasoner.reason(screen, goal, stepsExecuted)
+            reasoner.reason(input)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             DeviceAction.NoOp
         }
 
-    /** Logs and dispatches one action; act errors never stop the loop. */
-    // Injectable act hooks may throw anything; one failed gesture must not abort the task.
+    /** Logs and dispatches one action; act errors yield failure, never stop the loop. */
+    // Injectable executors may throw anything; one failed tool must not abort the task.
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun dispatch(action: DeviceAction) {
+    private suspend fun dispatch(action: DeviceAction): ToolOutcome {
         emit(DeviceEvent.ActionDispatched(action.eventName, stepsExecuted))
         Log.i(TAG, "${action.eventName} step=$stepsExecuted")
-        if (DeviceCommand.fromAction(action) == null) return
-        try {
-            actor(action)
+        return try {
+            toolExecutor.execute(action)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Act failed: ${e.javaClass.simpleName}")
+            ToolOutcome(success = false)
         }
     }
 
@@ -385,6 +425,17 @@ object DeviceAgentController {
         }
     }
 
+    /**
+     * Mutable per-task loop state.
+     */
+    private class LoopProgress {
+        /** Same-screen stuck detector. */
+        val tracker = SameScreenTracker()
+
+        /** Output of the last data-returning tool, for the next Reason step. */
+        var pendingObservation: String? = null
+    }
+
     private fun awaitIfPaused() {
         while (isPaused && !stopRequested) {
             val latch =
@@ -414,10 +465,5 @@ object DeviceAgentController {
         val result = DeviceControlBridge.execute(DeviceCommand.getUiTree())
         val payload = result.payload ?: ""
         return UiSnapshot(payload, UiTreeSerializer.stableHash(payload))
-    }
-
-    private fun liveAct(action: DeviceAction): Boolean {
-        val command = DeviceCommand.fromAction(action) ?: return true
-        return DeviceControlBridge.execute(command).success
     }
 }

@@ -8,10 +8,10 @@ package org.eu.nl.syu.zeroclaw.service.device
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.graphics.toColorInt
 
 /**
  * Google Lens-style screen-edge border shown while the agent is active.
@@ -77,10 +77,10 @@ class AgentBorderView @JvmOverloads constructor(
         val pulseDurationMs: Long,
     ) {
         /** Agent running: Google Blue, brisk subtle pulse. */
-        ACTIVE(Color.parseColor("#4285F4"), 1_200L),
+        ACTIVE("#4285F4".toColorInt(), 1_200L),
 
         /** Agent paused: amber, slow distinct pulse. */
-        PAUSED(Color.parseColor("#FFA000"), 2_200L),
+        PAUSED("#FFA000".toColorInt(), 2_200L),
     }
 
     private fun restartPulse() {

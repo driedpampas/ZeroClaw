@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.service.device.tools.AndroidDeviceToolExecutor
+import org.eu.nl.syu.zeroclaw.service.device.tools.PackageManagerAppOperator
 import org.eu.nl.syu.zeroclaw.service.engine.GatewayClient
 
 /**
@@ -85,6 +87,8 @@ class DeviceAgentService : Service() {
             Log.w(TAG, "Accessibility service not connected; parking task")
         }
         wireReasoner()
+        DeviceAgentController.toolExecutor =
+            AndroidDeviceToolExecutor(PackageManagerAppOperator(this))
         DeviceAgentController.start(goal, maxSteps, serviceScope)
     }
 
