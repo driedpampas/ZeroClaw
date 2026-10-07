@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.UUID
 import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
 import org.eu.nl.syu.zeroclaw.data.remote.ModelFetcher
 import org.eu.nl.syu.zeroclaw.model.Agent
@@ -47,7 +48,6 @@ import org.eu.nl.syu.zeroclaw.model.ProviderAuthType
 import org.eu.nl.syu.zeroclaw.ui.component.CollapsibleSection
 import org.eu.nl.syu.zeroclaw.ui.component.ConnectionPickerSection
 import org.eu.nl.syu.zeroclaw.ui.component.ModelSuggestionField
-import java.util.UUID
 
 /** Spacing between form fields. */
 private const val FIELD_SPACING_DP = 12

@@ -6,10 +6,6 @@
 
 package org.eu.nl.syu.zeroclaw.repository
 
-import org.eu.nl.syu.zeroclaw.data.local.dao.LogEntryDao
-import org.eu.nl.syu.zeroclaw.data.local.entity.LogEntryEntity
-import org.eu.nl.syu.zeroclaw.data.repository.RoomLogRepository
-import org.eu.nl.syu.zeroclaw.model.LogSeverity
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -18,6 +14,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.data.local.dao.LogEntryDao
+import org.eu.nl.syu.zeroclaw.data.local.entity.LogEntryEntity
+import org.eu.nl.syu.zeroclaw.data.repository.RoomLogRepository
+import org.eu.nl.syu.zeroclaw.model.LogSeverity
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

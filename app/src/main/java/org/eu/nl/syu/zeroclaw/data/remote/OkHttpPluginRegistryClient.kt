@@ -6,12 +6,12 @@
 
 package org.eu.nl.syu.zeroclaw.data.remote
 
-import org.eu.nl.syu.zeroclaw.model.RemotePlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.eu.nl.syu.zeroclaw.model.RemotePlugin
 
 /**
  * OkHttp-backed [PluginRegistryClient] implementation.

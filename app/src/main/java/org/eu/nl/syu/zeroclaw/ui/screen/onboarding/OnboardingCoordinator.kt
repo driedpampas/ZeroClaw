@@ -11,10 +11,29 @@ package org.eu.nl.syu.zeroclaw.ui.screen.onboarding
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import java.util.TimeZone
+import java.util.UUID
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
 import org.eu.nl.syu.zeroclaw.data.channel.ChannelSetupSpecs
@@ -42,25 +61,6 @@ import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.MemoryStepState
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.ProviderStepState
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.SecurityStepState
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.TunnelStepState
-import java.util.TimeZone
-import java.util.UUID
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
 
 /** Debounce delay in milliseconds before fetching models after input changes. */
 private const val MODEL_FETCH_DEBOUNCE_MS = 500L
@@ -371,7 +371,7 @@ class OnboardingCoordinator(
                 server = OAuthCallbackServer.startWithFallback()
                 val port = server.boundPort
                 val url = OpenAiOAuthManager.buildAuthorizeUrl(pkce, port)
-                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
                 handleOAuthCallback(server, pkce, port, context)
             } catch (e: Exception) {
                 _providerState.update {

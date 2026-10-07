@@ -6,9 +6,9 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.settings
 
-import org.eu.nl.syu.zeroclaw.model.AppSettings
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.model.AppSettings
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

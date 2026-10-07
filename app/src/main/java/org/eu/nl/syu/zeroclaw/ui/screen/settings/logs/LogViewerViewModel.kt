@@ -9,9 +9,6 @@ package org.eu.nl.syu.zeroclaw.ui.screen.settings.logs
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.model.LogEntry
-import org.eu.nl.syu.zeroclaw.model.LogSeverity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.model.LogEntry
+import org.eu.nl.syu.zeroclaw.model.LogSeverity
 
 /**
  * ViewModel for the log viewer screen.

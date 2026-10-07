@@ -6,15 +6,15 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.data.local.dao.ActivityEventDao
 import org.eu.nl.syu.zeroclaw.data.local.entity.ActivityEventEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
 import org.eu.nl.syu.zeroclaw.model.ActivityEvent
 import org.eu.nl.syu.zeroclaw.model.ActivityType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 /**
  * Room-backed [ActivityRepository] implementation.

@@ -9,15 +9,15 @@ package org.eu.nl.syu.zeroclaw.ui.screen.agents
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.model.Agent
-import org.eu.nl.syu.zeroclaw.model.ApiKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.model.Agent
+import org.eu.nl.syu.zeroclaw.model.ApiKey
 
 /**
  * ViewModel for the agent detail / edit screen.

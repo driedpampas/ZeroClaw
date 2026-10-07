@@ -6,13 +6,13 @@
 
 package org.eu.nl.syu.zeroclaw.data.remote
 
-import org.eu.nl.syu.zeroclaw.data.ProviderKeyValidator
-import org.eu.nl.syu.zeroclaw.model.ModelListFormat
-import org.eu.nl.syu.zeroclaw.model.ProviderInfo
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.eu.nl.syu.zeroclaw.data.ProviderKeyValidator
+import org.eu.nl.syu.zeroclaw.model.ModelListFormat
+import org.eu.nl.syu.zeroclaw.model.ProviderInfo
 import org.json.JSONArray
 import org.json.JSONObject
 

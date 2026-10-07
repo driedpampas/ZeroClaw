@@ -7,13 +7,14 @@
 package org.eu.nl.syu.zeroclaw.data.repository
 
 import android.content.SharedPreferences
+import androidx.core.content.edit
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.eu.nl.syu.zeroclaw.data.local.dao.ConnectedChannelDao
 import org.eu.nl.syu.zeroclaw.data.local.entity.toEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
 import org.eu.nl.syu.zeroclaw.model.ChannelType
 import org.eu.nl.syu.zeroclaw.model.ConnectedChannel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 /**
  * [ChannelConfigRepository] backed by Room for non-secret config and
@@ -43,11 +44,11 @@ class RoomChannelConfigRepository(
         secrets: Map<String, String>,
     ) {
         dao.upsert(channel.toEntity())
-        val editor = securePrefs.edit()
-        secrets.forEach { (key, value) ->
-            editor.putString(secretKey(channel.id, key), value)
+        securePrefs.edit {
+            secrets.forEach { (key, value) ->
+                putString(secretKey(channel.id, key), value)
+            }
         }
-        editor.apply()
     }
 
     override suspend fun delete(id: String) {
@@ -56,13 +57,13 @@ class RoomChannelConfigRepository(
         if (entity != null) {
             val model = entity.toModel()
             if (model != null) {
-                val editor = securePrefs.edit()
-                model.type.fields
-                    .filter { it.isSecret }
-                    .forEach { field ->
-                        editor.remove(secretKey(id, field.key))
-                    }
-                editor.apply()
+                securePrefs.edit {
+                    model.type.fields
+                        .filter { it.isSecret }
+                        .forEach { field ->
+                            remove(secretKey(id, field.key))
+                        }
+                }
             }
         }
     }

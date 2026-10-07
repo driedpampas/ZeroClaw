@@ -19,6 +19,15 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.data.repository.ActivityRepository
 import org.eu.nl.syu.zeroclaw.data.repository.AgentRepository
@@ -33,19 +42,10 @@ import org.eu.nl.syu.zeroclaw.model.LogSeverity
 import org.eu.nl.syu.zeroclaw.model.MemoryConflict
 import org.eu.nl.syu.zeroclaw.model.MemoryHealthResult
 import org.eu.nl.syu.zeroclaw.model.ServiceState
-import org.eu.nl.syu.zeroclaw.util.LogSanitizer
-import org.eu.nl.syu.zeroclaw.util.SecretCipher
 import org.eu.nl.syu.zeroclaw.service.engine.EngineException
 import org.eu.nl.syu.zeroclaw.service.engine.EnginePaths
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.util.LogSanitizer
+import org.eu.nl.syu.zeroclaw.util.SecretCipher
 
 /**
  * Always-on foreground service that manages the ZeroClaw daemon lifecycle.
@@ -186,7 +186,9 @@ class ZeroClawDaemonService : Service() {
             )
         val alarmManager =
             getSystemService(ALARM_SERVICE) as AlarmManager
-        alarmManager.setExactAndAllowWhileIdle(
+        // Inexact alarm is sufficient for restart fallback; exact alarms would require
+        // SCHEDULE_EXACT_ALARM permission and are reserved for user-visible timing.
+        alarmManager.setAndAllowWhileIdle(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
             SystemClock.elapsedRealtime() + RESTART_DELAY_MS,
             pendingIntent,
@@ -290,7 +292,7 @@ class ZeroClawDaemonService : Service() {
      * @param configToml Retained for call-site compatibility.
      * @return `true` so startup proceeds.
      */
-    @Suppress("UnusedPrivateMember")
+    @Suppress("UnusedPrivateMember", "FunctionOnlyReturningConstant")
     private suspend fun validateConfigOrStop(configToml: String): Boolean = true
 
     /**
@@ -1044,7 +1046,9 @@ class ZeroClawDaemonService : Service() {
         notificationId: Int,
         notification: android.app.Notification,
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // FOREGROUND_SERVICE_TYPE_SPECIAL_USE was added in API 34; on older releases
+        // the inlined constant would be unknown to the system, so use the 2-arg overload.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 notificationId,
                 notification,

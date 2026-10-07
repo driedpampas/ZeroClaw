@@ -9,7 +9,7 @@ package org.eu.nl.syu.zeroclaw.util
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 
 /**
  * Describes a deep-link destination with an optional fallback URL.
@@ -150,13 +150,13 @@ object ExternalAppLauncher {
         context: Context,
         target: DeepLinkTarget,
     ) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri))
+        val intent = Intent(Intent.ACTION_VIEW, target.uri.toUri())
         try {
             context.startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             val fallback = target.fallbackUri
             if (fallback != null) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fallback)))
+                context.startActivity(Intent(Intent.ACTION_VIEW, fallback.toUri()))
             } else {
                 throw e
             }

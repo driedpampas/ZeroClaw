@@ -48,6 +48,7 @@ import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
  *
  * @param edgeMargin Horizontal padding based on window width size class.
  * @param onNavigateToQrScanner Callback to navigate to the QR code scanner.
+ * @param onNavigateToWebDashboard Callback to navigate to the web dashboard.
  * @param settingsViewModel The shared [SettingsViewModel].
  * @param modifier Modifier applied to the root layout.
  */
@@ -76,6 +77,7 @@ fun GatewayScreen(
  *
  * @param settings Current application settings snapshot.
  * @param onNavigateToQrScanner Callback to navigate to the QR code scanner.
+ * @param onNavigateToWebDashboard Callback to navigate to the web dashboard.
  * @param settingsViewModel ViewModel for settings mutations.
  * @param edgeMargin Horizontal padding based on window width size class.
  * @param modifier Modifier applied to the root layout.

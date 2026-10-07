@@ -44,9 +44,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.util.LocalPowerSaveMode
 import org.eu.nl.syu.zeroclaw.util.PinHasher
-import kotlinx.coroutines.launch
 
 /**
  * Full-screen lock gate overlay.

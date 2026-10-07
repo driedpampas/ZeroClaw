@@ -60,8 +60,7 @@ class EngineConfigSync(
     /** Returns the gateway's current merged config view. */
     suspend fun current(): JSONObject = withContext(ioDispatcher) { client.configList() }
 
-    private fun configFileStamp(): Long =
-        File(paths.configDir, "config.toml").takeIf { it.isFile }?.lastModified() ?: -1L
+    private fun configFileStamp(): Long = File(paths.configDir, "config.toml").takeIf { it.isFile }?.lastModified() ?: -1L
 
     private companion object {
         private const val DEFAULT_POLL_MS = 3_000L

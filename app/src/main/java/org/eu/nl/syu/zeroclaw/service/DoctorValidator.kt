@@ -15,6 +15,10 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
 import org.eu.nl.syu.zeroclaw.data.repository.AgentRepository
 import org.eu.nl.syu.zeroclaw.data.repository.ApiKeyRepository
@@ -27,8 +31,6 @@ import org.eu.nl.syu.zeroclaw.model.KeyStatus
 import org.eu.nl.syu.zeroclaw.model.ProviderAuthType
 import org.eu.nl.syu.zeroclaw.model.isExpired
 import org.eu.nl.syu.zeroclaw.model.isOAuthToken
-import org.eu.nl.syu.zeroclaw.util.BatteryOptimization
-import org.eu.nl.syu.zeroclaw.service.engine.EngineCli
 import org.eu.nl.syu.zeroclaw.service.engine.EngineException
 import org.eu.nl.syu.zeroclaw.service.engine.GatewayClient
 import org.eu.nl.syu.zeroclaw.service.engine.arr
@@ -37,11 +39,7 @@ import org.eu.nl.syu.zeroclaw.service.engine.long
 import org.eu.nl.syu.zeroclaw.service.engine.obj
 import org.eu.nl.syu.zeroclaw.service.engine.rfc3339ToEpochMs
 import org.eu.nl.syu.zeroclaw.service.engine.string
-import java.io.IOException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
+import org.eu.nl.syu.zeroclaw.util.BatteryOptimization
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -57,6 +55,7 @@ import org.json.JSONObject
  * @param agentRepository Repository for reading agent configurations.
  * @param apiKeyRepository Repository for reading API key status.
  * @param ioDispatcher Dispatcher for blocking FFI calls and I/O.
+ * @param gateway Gateway client for live engine state.
  */
 class DoctorValidator(
     private val context: Context,
@@ -64,7 +63,6 @@ class DoctorValidator(
     private val apiKeyRepository: ApiKeyRepository,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val gateway: GatewayClient = GatewayClient(GatewayClient.loopback(), ioDispatcher = ioDispatcher),
-    private val cli: EngineCli? = null,
 ) {
     /**
      * Validates each agent's TOML config individually and the combined config.
@@ -212,7 +210,7 @@ class DoctorValidator(
      * @param expectedChannels Room-enabled channel TOML keys expected to be live.
      * @return List of diagnostic checks for the channels category.
      */
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "UnusedParameter")
     suspend fun runChannelChecks(
         configToml: String,
         dataDir: String,
@@ -274,7 +272,11 @@ class DoctorValidator(
                         events.filter { event ->
                             val severity = event.string("severity_text", "severity").orEmpty().lowercase()
                             val category =
-                                event.optJSONObject("event")?.string("category").orEmpty().lowercase()
+                                event
+                                    .optJSONObject("event")
+                                    ?.string("category")
+                                    .orEmpty()
+                                    .lowercase()
                             severity == "error" || category == "error"
                         }
                     JSONArray(errors.map { it.toString() }).toString()
@@ -684,7 +686,6 @@ class DoctorValidator(
         private const val BYTES_PER_MB = 1_048_576L
         private const val LOW_STORAGE_THRESHOLD_MB = 50L
         private const val WARN_STORAGE_THRESHOLD_MB = 200L
-        private const val TRACE_ERROR_LIMIT: UInt = 5u
 
         /**
          * Formats an uptime duration in seconds to a human-readable string.
@@ -728,7 +729,8 @@ private fun buildChannelCheck(
     val status = obj.optString("status")
     val health = obj.optString("health")
     val owningAgent =
-        obj.optString("owning_agent")
+        obj
+            .optString("owning_agent")
             .takeIf { obj.has("owning_agent") && !obj.isNull("owning_agent") }
             .orEmpty()
     val listenerStatus =

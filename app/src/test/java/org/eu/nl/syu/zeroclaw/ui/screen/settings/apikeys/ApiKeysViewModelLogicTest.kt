@@ -6,11 +6,11 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.settings.apikeys
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import org.eu.nl.syu.zeroclaw.data.repository.InMemoryApiKeyRepository
 import org.eu.nl.syu.zeroclaw.model.ApiKey
 import org.eu.nl.syu.zeroclaw.ui.screen.settings.TestSettingsRepository
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

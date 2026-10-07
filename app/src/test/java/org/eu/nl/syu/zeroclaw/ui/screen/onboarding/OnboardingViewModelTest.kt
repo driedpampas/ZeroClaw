@@ -6,10 +6,10 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.onboarding
 
-import org.eu.nl.syu.zeroclaw.data.repository.OnboardingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.data.repository.OnboardingRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

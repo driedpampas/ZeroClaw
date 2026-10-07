@@ -11,11 +11,10 @@ import java.io.IOException
 /**
  * Error raised by the gateway-native service layer.
  *
- * Replaces the former UniFFI `FfiException` hierarchy. [detail] carries the
- * engine- or transport-supplied message so callers can classify it (for example
- * to detect API-key rejections).
+ * Replaces the former UniFFI `FfiException` hierarchy.
  *
- * @param detail Human-readable error detail.
+ * @property detail Engine- or transport-supplied message so callers can classify it
+ *   (for example to detect API-key rejections).
  * @param cause Optional underlying cause.
  */
 open class EngineException(
@@ -26,6 +25,9 @@ open class EngineException(
 /**
  * Engine error indicating a lifecycle/state problem (not running, already
  * running, shutdown in progress).
+ *
+ * @param detail Human-readable error detail.
+ * @param cause Optional underlying cause.
  */
 class EngineStateException(
     detail: String,

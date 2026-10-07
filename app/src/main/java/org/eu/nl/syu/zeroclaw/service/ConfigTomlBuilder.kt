@@ -480,6 +480,11 @@ object ConfigTomlBuilder {
             "custom-openai",
         )
 
+    private const val LEGACY_GUILD_ID_KEY = "guild_id"
+    private const val LEGACY_CHANNEL_ID_KEY = "channel_id"
+    private val PLURAL_CHANNEL_KEYS = listOf("guild_ids", "channel_ids")
+    private const val TELEGRAM_DRAFT_INTERVAL_MS = 1000
+
     /**
      * Builds a TOML configuration string from the given parameters.
      *
@@ -1368,40 +1373,70 @@ object ConfigTomlBuilder {
             appendLine("cli = false")
 
             for ((channel, values) in channelsWithSecrets) {
-                val folded = foldLegacyChannelKeys(values)
-                appendLine()
-                appendLine("[channels.${channel.type.tomlKey}.${channel.type.tomlKey}]")
-                appendLine("enabled = true")
-                val emitted = mutableSetOf("enabled")
-                for (spec in channel.type.fields) {
-                    // Legacy singulars are folded above; never emit them.
-                    if (spec.key == "guild_id" || spec.key == "channel_id") continue
-                    val value = folded[spec.key].orEmpty()
-                    if (value.isBlank() && !spec.isRequired) continue
-                    val emittedValue =
-                        if (spec.isSecret) protect(value, encryptSecret) else value
-                    appendTomlField(spec.key, emittedValue, spec.inputType)
-                    emitted += spec.key
-                }
-                // Folded plural keys on types whose spec only declares the
-                // singular (e.g. Mattermost `channel_id` -> `channel_ids`).
-                for (plural in listOf("guild_ids", "channel_ids")) {
-                    if (plural in emitted) continue
-                    val value = folded[plural].orEmpty()
-                    if (value.isBlank()) continue
-                    appendTomlField(plural, value, FieldInputType.LIST)
-                }
-                if (channel.type == ChannelType.TELEGRAM) {
-                    appendLine("stream_mode = \"partial\"")
-                    appendLine("draft_update_interval_ms = 1000")
-                    appendLine("interrupt_on_new_message = true")
-                }
-                if (channel.type == ChannelType.DISCORD) {
-                    // Register application (slash) commands per configured guild.
-                    appendLine("slash_commands = true")
-                }
-                appendPeerGroup(channel, folded)
+                appendChannel(channel, values, encryptSecret)
             }
+        }
+    }
+
+    private fun StringBuilder.appendChannel(
+        channel: ConnectedChannel,
+        values: Map<String, String>,
+        encryptSecret: ((String) -> String)?,
+    ) {
+        val folded = foldLegacyChannelKeys(values)
+        appendLine()
+        appendLine("[channels.${channel.type.tomlKey}.${channel.type.tomlKey}]")
+        appendLine("enabled = true")
+        val emitted = mutableSetOf("enabled")
+        appendSpecFields(channel, folded, encryptSecret, emitted)
+        appendPluralFields(folded, emitted)
+        appendChannelTypeExtras(channel)
+        appendPeerGroup(channel, folded)
+    }
+
+    private fun StringBuilder.appendSpecFields(
+        channel: ConnectedChannel,
+        folded: Map<String, String>,
+        encryptSecret: ((String) -> String)?,
+        emitted: MutableSet<String>,
+    ) {
+        for (spec in channel.type.fields) {
+            val valueToEmit = specEmittableValue(spec, folded) ?: continue
+            val emittedValue = if (spec.isSecret) protect(valueToEmit, encryptSecret) else valueToEmit
+            appendTomlField(spec.key, emittedValue, spec.inputType)
+            emitted += spec.key
+        }
+    }
+
+    private fun specEmittableValue(
+        spec: org.eu.nl.syu.zeroclaw.model.ChannelFieldSpec,
+        folded: Map<String, String>,
+    ): String? {
+        if (spec.key == LEGACY_GUILD_ID_KEY || spec.key == LEGACY_CHANNEL_ID_KEY) return null
+        val value = folded[spec.key].orEmpty()
+        if (value.isBlank() && !spec.isRequired) return null
+        return value
+    }
+
+    private fun StringBuilder.appendPluralFields(
+        folded: Map<String, String>,
+        emitted: MutableSet<String>,
+    ) {
+        for (plural in PLURAL_CHANNEL_KEYS) {
+            val value = folded[plural].orEmpty().takeIf { plural !in emitted && it.isNotBlank() } ?: continue
+            appendTomlField(plural, value, FieldInputType.LIST)
+        }
+    }
+
+    private fun StringBuilder.appendChannelTypeExtras(channel: ConnectedChannel) {
+        if (channel.type == ChannelType.TELEGRAM) {
+            appendLine("stream_mode = \"partial\"")
+            appendLine("draft_update_interval_ms = $TELEGRAM_DRAFT_INTERVAL_MS")
+            appendLine("interrupt_on_new_message = true")
+        }
+        if (channel.type == ChannelType.DISCORD) {
+            // Register application (slash) commands per configured guild.
+            appendLine("slash_commands = true")
         }
     }
 
@@ -1422,7 +1457,8 @@ object ConfigTomlBuilder {
         values: Map<String, String>,
     ) {
         val peers =
-            values["allowed_users"].orEmpty()
+            values["allowed_users"]
+                .orEmpty()
                 .split(",")
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }

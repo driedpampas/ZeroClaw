@@ -82,8 +82,9 @@ object DeviceControlBridge {
      */
     @Suppress("TooGenericExceptionCaught", "ReturnCount")
     fun execute(command: DeviceCommand): DeviceCommandResult {
-        val service = serviceInstance
-            ?: return DeviceCommandResult.error("SERVICE_NOT_CONNECTED")
+        val service =
+            serviceInstance
+                ?: return DeviceCommandResult.error("SERVICE_NOT_CONNECTED")
 
         if (Looper.myLooper() == Looper.getMainLooper()) {
             val future = CompletableFuture<DeviceCommandResult>()

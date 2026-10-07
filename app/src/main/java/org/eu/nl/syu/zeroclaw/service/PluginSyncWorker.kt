@@ -10,9 +10,9 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.flow.first
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.data.remote.OkHttpPluginRegistryClient
-import kotlinx.coroutines.flow.first
 
 /**
  * Periodic [CoroutineWorker] that synchronises the local plugin database

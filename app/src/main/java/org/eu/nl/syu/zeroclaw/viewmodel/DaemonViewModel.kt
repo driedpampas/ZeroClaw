@@ -10,6 +10,15 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ActivityEvent
 import org.eu.nl.syu.zeroclaw.model.CostSummary
@@ -25,15 +34,6 @@ import org.eu.nl.syu.zeroclaw.service.CronBridge
 import org.eu.nl.syu.zeroclaw.service.DaemonServiceBridge
 import org.eu.nl.syu.zeroclaw.service.HealthBridge
 import org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Represents the possible states of an asynchronous daemon UI operation.

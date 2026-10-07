@@ -33,8 +33,11 @@ class EngineCli(
 ) {
     /** Result of a one-shot CLI invocation. */
     data class Result(
+        /** Process exit code; 0 means success. */
         val exitCode: Int,
+        /** Captured standard output. */
         val stdout: String,
+        /** Captured standard error. */
         val stderr: String,
     ) {
         /** Whether the command exited successfully. */
@@ -76,6 +79,7 @@ class EngineCli(
     /** Removes an installed skill by name. */
     suspend fun removeSkill(name: String): Result = run("skills", "remove", name)
 
+    /** Factory helpers for [EngineCli]. */
     companion object {
         private const val DEFAULT_TIMEOUT_SECONDS = 120L
 

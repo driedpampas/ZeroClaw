@@ -6,11 +6,11 @@
 
 package org.eu.nl.syu.zeroclaw.data.local
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
 import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
 import org.eu.nl.syu.zeroclaw.model.PluginCategory
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * Provides seed data for first-install database population.

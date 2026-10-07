@@ -9,9 +9,6 @@ package org.eu.nl.syu.zeroclaw.ui.screen.settings.apikeys
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.service.engine.EngineCli
-import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -21,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.service.engine.EngineCli
+import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
 
 /**
  * Presentation model for a single auth profile displayed in the list.
@@ -138,7 +138,7 @@ class AuthProfilesViewModel(
         viewModelScope.launch {
             runMutation("Profile removed") {
                 withContext(Dispatchers.IO) {
-                    val runner = cli ?: throw IllegalStateException("Engine CLI unavailable")
+                    val runner = cli ?: error("Engine CLI unavailable")
                     val result =
                         runner.run(
                             "auth",
@@ -149,7 +149,7 @@ class AuthProfilesViewModel(
                             profileName.ifBlank { "default" },
                         )
                     if (!result.isSuccess) {
-                        throw IllegalStateException(result.stderr.ifBlank { "logout failed" })
+                        error(result.stderr.ifBlank { "logout failed" })
                     }
                 }
             }

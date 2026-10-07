@@ -9,8 +9,8 @@ package org.eu.nl.syu.zeroclaw.data.local.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import org.eu.nl.syu.zeroclaw.data.local.entity.ConnectedChannelEntity
 import kotlinx.coroutines.flow.Flow
+import org.eu.nl.syu.zeroclaw.data.local.entity.ConnectedChannelEntity
 
 /**
  * Data access object for connected channel CRUD operations.

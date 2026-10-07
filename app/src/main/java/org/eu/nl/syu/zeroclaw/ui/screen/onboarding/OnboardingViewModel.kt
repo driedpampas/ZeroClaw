@@ -9,14 +9,6 @@ package org.eu.nl.syu.zeroclaw.ui.screen.onboarding
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
-import org.eu.nl.syu.zeroclaw.data.remote.ModelFetcher
-import org.eu.nl.syu.zeroclaw.model.Agent
-import org.eu.nl.syu.zeroclaw.model.ApiKey
-import org.eu.nl.syu.zeroclaw.model.ChannelType
-import org.eu.nl.syu.zeroclaw.model.ConnectedChannel
-import org.eu.nl.syu.zeroclaw.model.ModelListFormat
 import java.util.TimeZone
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +22,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
+import org.eu.nl.syu.zeroclaw.data.remote.ModelFetcher
+import org.eu.nl.syu.zeroclaw.model.Agent
+import org.eu.nl.syu.zeroclaw.model.ApiKey
+import org.eu.nl.syu.zeroclaw.model.ChannelType
+import org.eu.nl.syu.zeroclaw.model.ConnectedChannel
+import org.eu.nl.syu.zeroclaw.model.ModelListFormat
 
 /** Total number of onboarding steps (including channel setup). */
 private const val TOTAL_STEPS = 5

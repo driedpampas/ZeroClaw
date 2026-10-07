@@ -12,10 +12,11 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
-import org.eu.nl.syu.zeroclaw.model.ProcessedImage
+import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.eu.nl.syu.zeroclaw.model.ProcessedImage
 
 /**
  * Processes gallery images for transmission to vision APIs via the FFI bridge.
@@ -152,7 +153,7 @@ object ImageProcessor {
         val scale = MAX_DIMENSION.toFloat() / longest
         val newWidth = (bitmap.width * scale).toInt()
         val newHeight = (bitmap.height * scale).toInt()
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        return bitmap.scale(newWidth, newHeight)
     }
 
     /**

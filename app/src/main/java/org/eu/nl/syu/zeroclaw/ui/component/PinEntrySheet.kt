@@ -39,8 +39,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import org.eu.nl.syu.zeroclaw.util.PinHasher
 import kotlinx.coroutines.delay
+import org.eu.nl.syu.zeroclaw.util.PinHasher
 
 /**
  * Modal bottom sheet for PIN setup, change, or verification.

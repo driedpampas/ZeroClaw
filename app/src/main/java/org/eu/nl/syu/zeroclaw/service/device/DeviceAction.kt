@@ -31,7 +31,10 @@ sealed interface DeviceAction {
      * @property x X coordinate in pixels.
      * @property y Y coordinate in pixels.
      */
-    data class Tap(val x: Int, val y: Int) : DeviceAction {
+    data class Tap(
+        val x: Int,
+        val y: Int,
+    ) : DeviceAction {
         override val eventName: String = "ACTION_TAP"
     }
 
@@ -72,7 +75,10 @@ sealed interface DeviceAction {
      * @property text Text to type (never logged).
      * @property resourceId Optional target view resource ID.
      */
-    data class Type(val text: String, val resourceId: String? = null) : DeviceAction {
+    data class Type(
+        val text: String,
+        val resourceId: String? = null,
+    ) : DeviceAction {
         override val eventName: String = "ACTION_TYPE"
     }
 
@@ -82,7 +88,10 @@ sealed interface DeviceAction {
      * @property resourceId Optional Android view resource ID.
      * @property text Optional visible-text match (never logged).
      */
-    data class ClickNode(val resourceId: String? = null, val text: String? = null) : DeviceAction {
+    data class ClickNode(
+        val resourceId: String? = null,
+        val text: String? = null,
+    ) : DeviceAction {
         override val eventName: String = "ACTION_CLICK"
     }
 
@@ -91,7 +100,9 @@ sealed interface DeviceAction {
      *
      * @property actionId `AccessibilityService.GLOBAL_ACTION_*` constant.
      */
-    data class Global(val actionId: Int) : DeviceAction {
+    data class Global(
+        val actionId: Int,
+    ) : DeviceAction {
         override val eventName: String = "ACTION_GLOBAL"
     }
 
@@ -101,7 +112,9 @@ sealed interface DeviceAction {
      * @property packageName Application package (e.g. `com.android.settings`).
      *   Discovered via [ListApps]; never logged.
      */
-    data class OpenApp(val packageName: String) : DeviceAction {
+    data class OpenApp(
+        val packageName: String,
+    ) : DeviceAction {
         override val eventName: String = "ACTION_OPEN_APP"
     }
 
@@ -113,7 +126,9 @@ sealed interface DeviceAction {
      *
      * @property query Case-insensitive label/package filter, or null for all.
      */
-    data class ListApps(val query: String? = null) : DeviceAction {
+    data class ListApps(
+        val query: String? = null,
+    ) : DeviceAction {
         override val eventName: String = "ACTION_LIST_APPS"
     }
 
@@ -127,7 +142,9 @@ sealed interface DeviceAction {
      *
      * @property summary Short outcome description (structured only).
      */
-    data class Finish(val summary: String = "") : DeviceAction {
+    data class Finish(
+        val summary: String = "",
+    ) : DeviceAction {
         override val eventName: String = "ACTION_FINISH"
     }
 

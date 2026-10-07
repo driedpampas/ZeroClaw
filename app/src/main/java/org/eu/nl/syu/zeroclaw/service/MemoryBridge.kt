@@ -35,6 +35,7 @@ class MemoryBridge(
      * @throws IOException if the gateway is unreachable or returns an error.
      */
     @Throws(IOException::class)
+    @Suppress("UnusedParameter")
     suspend fun listMemories(
         category: String? = null,
         limit: UInt = DEFAULT_LIMIT,
@@ -51,6 +52,7 @@ class MemoryBridge(
      * @throws IOException if the gateway is unreachable or returns an error.
      */
     @Throws(IOException::class)
+    @Suppress("UnusedParameter")
     suspend fun recallMemory(
         query: String,
         limit: UInt = DEFAULT_LIMIT,

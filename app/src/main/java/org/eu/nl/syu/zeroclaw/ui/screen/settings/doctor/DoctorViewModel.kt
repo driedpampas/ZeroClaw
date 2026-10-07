@@ -9,6 +9,11 @@ package org.eu.nl.syu.zeroclaw.ui.screen.settings.doctor
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ApiKey
 import org.eu.nl.syu.zeroclaw.model.AppSettings
@@ -21,11 +26,6 @@ import org.eu.nl.syu.zeroclaw.service.ConfigTomlBuilder
 import org.eu.nl.syu.zeroclaw.service.DoctorValidator
 import org.eu.nl.syu.zeroclaw.service.GlobalTomlConfig
 import org.eu.nl.syu.zeroclaw.util.LogSanitizer
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 /**
  * ViewModel for the ZeroClaw Doctor diagnostics screen.
@@ -102,7 +102,8 @@ class DoctorViewModel(
                     configToml = buildCurrentToml(),
                     dataDir = app.filesDir.absolutePath,
                     expectedChannels =
-                        app.channelConfigRepository.channels.first()
+                        app.channelConfigRepository.channels
+                            .first()
                             .filter { it.isEnabled }
                             .map { it.type.tomlKey },
                 )

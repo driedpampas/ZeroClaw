@@ -42,6 +42,7 @@ import org.json.JSONObject
  *   for loopback (short connect timeout, no retry spam).
  * @param ioDispatcher Dispatcher for blocking HTTP calls.
  */
+@Suppress("TooManyFunctions")
 class GatewayClient(
     private val baseUrl: String,
     private val httpClient: OkHttpClient = defaultClient(),
@@ -97,8 +98,7 @@ class GatewayClient(
     suspend fun configDrift(): JSONObject = get("/api/config/drift")
 
     /** `GET /api/config/prop?path=...` — read a single property. */
-    suspend fun configProp(path: String): JSONObject =
-        get("/api/config/prop?path=${encode(path)}")
+    suspend fun configProp(path: String): JSONObject = get("/api/config/prop?path=${encode(path)}")
 
     /** `PUT /api/config/prop` — set a single property. */
     suspend fun setConfigProp(
@@ -180,36 +180,78 @@ class GatewayClient(
             var data = StringBuilder()
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
-                when {
-                    line.isEmpty() -> {
-                        if (data.isNotEmpty()) {
-                            runCatching { JSONObject(data.toString()) }.onSuccess(emit)
-                            data = StringBuilder()
-                        }
-                    }
-                    line.startsWith("data:") -> data.append(line.removePrefix("data:").trim())
-                }
+                data = handleSseLine(line, data, emit)
             }
         } catch (e: IOException) {
             Log.d(TAG, "SSE reader closed: ${e.message}")
         }
     }
 
+    private fun handleSseLine(
+        line: String,
+        data: StringBuilder,
+        emit: (JSONObject) -> Unit,
+    ): StringBuilder {
+        if (line.isEmpty()) {
+            if (data.isNotEmpty()) {
+                runCatching { JSONObject(data.toString()) }.onSuccess(emit)
+                return StringBuilder()
+            }
+            return data
+        }
+        if (line.startsWith(SSE_DATA_PREFIX)) {
+            data.append(line.removePrefix(SSE_DATA_PREFIX).trim())
+        }
+        return data
+    }
+
     // ---- Chat (WebSocket) ------------------------------------------------
 
     /** One decoded `/ws/chat` server frame. */
     sealed interface ChatFrame {
-        data class Chunk(val text: String) : ChatFrame
+        /** Streaming text chunk. */
+        data class Chunk(
+            /** Chunk text. */
+            val text: String,
+        ) : ChatFrame
 
-        data class Thinking(val text: String) : ChatFrame
+        /** Streaming thinking chunk. */
+        data class Thinking(
+            /** Thinking text. */
+            val text: String,
+        ) : ChatFrame
 
-        data class ToolCall(val id: String?, val name: String?, val args: String?) : ChatFrame
+        /** Tool call request from the model. */
+        data class ToolCall(
+            /** Tool call id. */
+            val id: String?,
+            /** Tool name. */
+            val name: String?,
+            /** JSON-encoded tool arguments. */
+            val args: String?,
+        ) : ChatFrame
 
-        data class ToolResult(val id: String?, val name: String?, val output: String?) : ChatFrame
+        /** Tool execution result. */
+        data class ToolResult(
+            /** Tool call id. */
+            val id: String?,
+            /** Tool name. */
+            val name: String?,
+            /** Tool output text. */
+            val output: String?,
+        ) : ChatFrame
 
-        data class Error(val message: String) : ChatFrame
+        /** Stream error frame. */
+        data class Error(
+            /** Human-readable error message. */
+            val message: String,
+        ) : ChatFrame
 
-        data class Done(val fullResponse: String) : ChatFrame
+        /** Stream completion frame. */
+        data class Done(
+            /** Full accumulated response. */
+            val fullResponse: String,
+        ) : ChatFrame
     }
 
     /**
@@ -253,7 +295,7 @@ class GatewayClient(
                             val frame = decodeFrame(text)
                             if (frame != null) trySend(frame)
                             if (frame is ChatFrame.Done || frame is ChatFrame.Error) {
-                                webSocket.close(1000, "done")
+                                webSocket.close(WEBSOCKET_NORMAL_CLOSURE, "done")
                             }
                         }
 
@@ -275,7 +317,7 @@ class GatewayClient(
                     },
                 )
             awaitClose {
-                runCatching { socket.close(1000, "client closed") }
+                runCatching { socket.close(WEBSOCKET_NORMAL_CLOSURE, "client closed") }
             }
         }
 
@@ -387,15 +429,26 @@ class GatewayClient(
 
     private fun encode(value: String): String = java.net.URLEncoder.encode(value, "UTF-8")
 
-    /** Gateway returned a non-2xx response; [body] carries the error payload. */
+    /**
+     * Gateway returned a non-2xx response.
+     *
+     * @param message Human-readable error message.
+     * @property body Raw error payload, if any.
+     * @param cause Underlying cause, if any.
+     */
     class GatewayException(
         message: String,
+        /** Raw error payload, if any. */
         val body: String? = null,
         cause: Throwable? = null,
     ) : IOException(message, cause)
 
+    /** Constants and factory helpers for [GatewayClient]. */
     companion object {
         private const val TAG = "GatewayClient"
+        private const val WEBSOCKET_NORMAL_CLOSURE = 1000
+        private const val SSE_DATA_PREFIX = "data:"
+        private const val CONNECT_TIMEOUT_SECONDS = 5L
 
         /** Loopback origin for the default engine port. */
         fun loopback(port: Int = EngineProcessManager.DEFAULT_PORT): String = "http://127.0.0.1:$port"
@@ -403,7 +456,7 @@ class GatewayClient(
         private fun defaultClient(): OkHttpClient =
             OkHttpClient
                 .Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
+                .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(0, TimeUnit.MILLISECONDS)
                 .retryOnConnectionFailure(true)
                 .build()

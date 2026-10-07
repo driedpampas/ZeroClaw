@@ -59,8 +59,7 @@ internal fun JSONObject.obj(key: String): JSONObject? = optJSONObject(key)
 internal fun JSONObject.arr(key: String): JSONArray? = optJSONArray(key)
 
 /** Materialises a [JSONArray] of objects. */
-internal fun JSONArray.objects(): List<JSONObject> =
-    (0 until length()).mapNotNull { idx -> optJSONObject(idx) }
+internal fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull { idx -> optJSONObject(idx) }
 
 /**
  * Wraps a bare array response (`[ ... ]`) as `{ "<key>": [ ... ] }` when the
@@ -77,7 +76,9 @@ internal fun rfc3339ToEpochMs(value: String?): Long? {
     if (value.isNullOrBlank()) return null
     return try {
         Instant.parse(value).toEpochMilli()
-    } catch (@Suppress("SwallowedException") e: Exception) {
+    } catch (
+        @Suppress("SwallowedException") e: java.time.format.DateTimeParseException,
+    ) {
         null
     }
 }

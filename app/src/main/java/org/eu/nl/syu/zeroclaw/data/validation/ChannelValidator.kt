@@ -6,11 +6,11 @@
 
 package org.eu.nl.syu.zeroclaw.data.validation
 
-import org.eu.nl.syu.zeroclaw.model.ChannelType
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.eu.nl.syu.zeroclaw.model.ChannelType
 import org.json.JSONObject
 
 /**

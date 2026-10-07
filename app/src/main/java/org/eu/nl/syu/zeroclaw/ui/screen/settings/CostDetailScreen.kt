@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.Locale
 import org.eu.nl.syu.zeroclaw.ui.component.ErrorCard
 import org.eu.nl.syu.zeroclaw.ui.component.LoadingIndicator
 import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
@@ -36,7 +37,6 @@ import org.eu.nl.syu.zeroclaw.util.BUDGET_WARNING_THRESHOLD
 import org.eu.nl.syu.zeroclaw.util.DEFAULT_MONTHLY_BUDGET_USD
 import org.eu.nl.syu.zeroclaw.util.MAX_PROGRESS
 import org.eu.nl.syu.zeroclaw.util.formatUsd
-import java.util.Locale
 
 /**
  * Cost detail screen showing session, daily, and monthly totals with

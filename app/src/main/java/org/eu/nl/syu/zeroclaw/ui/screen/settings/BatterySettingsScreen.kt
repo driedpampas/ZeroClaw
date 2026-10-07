@@ -7,7 +7,6 @@
 package org.eu.nl.syu.zeroclaw.ui.screen.settings
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
 import org.eu.nl.syu.zeroclaw.util.BatteryOptimization
@@ -133,7 +133,7 @@ fun BatterySettingsScreen(
                         onClick = {
                             val url = BatteryOptimization.getOemInstructionsUrl(oemType)
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+                                Intent(Intent.ACTION_VIEW, url.toUri()),
                             )
                         },
                     ) {

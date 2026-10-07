@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.net.toUri
 import org.eu.nl.syu.zeroclaw.service.engine.EngineProcessManager
 
 /**
@@ -52,7 +53,11 @@ import org.eu.nl.syu.zeroclaw.service.engine.EngineProcessManager
  *
  * @param host Loopback host of the gateway.
  * @param port Gateway port.
+ *
+ * JavaScript is required for the local dashboard web app; navigation is locked
+ * to loopback by LoopbackWebViewClient, so no remote content is loaded.
  */
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun WebDashboardScreen(
     host: String = "127.0.0.1",
@@ -94,7 +99,7 @@ fun WebDashboardScreen(
             },
         )
 
-        if (progress in 1..99) {
+        if (progress in PROGRESS_START..PROGRESS_END) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
 
@@ -146,7 +151,9 @@ private fun openInBrowser(
     context: Context,
     url: String,
 ) {
-    val intent =
-        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, url.toUri())
     runCatching { context.startActivity(intent) }
 }
+
+private const val PROGRESS_START = 1
+private const val PROGRESS_END = 99

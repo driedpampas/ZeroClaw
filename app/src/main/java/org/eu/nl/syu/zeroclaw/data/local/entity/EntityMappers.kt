@@ -6,6 +6,8 @@
 
 package org.eu.nl.syu.zeroclaw.data.local.entity
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.eu.nl.syu.zeroclaw.model.ActivityEvent
 import org.eu.nl.syu.zeroclaw.model.ActivityType
 import org.eu.nl.syu.zeroclaw.model.Agent
@@ -17,8 +19,6 @@ import org.eu.nl.syu.zeroclaw.model.LogSeverity
 import org.eu.nl.syu.zeroclaw.model.Plugin
 import org.eu.nl.syu.zeroclaw.model.PluginCategory
 import org.eu.nl.syu.zeroclaw.model.TerminalEntry
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * Shared [Json] instance configured with lenient parsing for entity mappers.

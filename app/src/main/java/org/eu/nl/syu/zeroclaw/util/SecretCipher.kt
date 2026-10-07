@@ -46,7 +46,10 @@ object SecretCipher {
      * @return `enc2:`-prefixed ciphertext, or the original value.
      */
     @Suppress("TooGenericExceptionCaught")
-    fun encrypt(plaintext: String, configDir: File): String {
+    fun encrypt(
+        plaintext: String,
+        configDir: File,
+    ): String {
         if (plaintext.isEmpty() || isAlreadyProtected(plaintext)) return plaintext
         return try {
             val key = loadOrCreateKey(configDir)
@@ -66,8 +69,7 @@ object SecretCipher {
     }
 
     /** Whether a value is already encrypted or an external reference. */
-    private fun isAlreadyProtected(value: String): Boolean =
-        value.startsWith("enc2:") || value.startsWith("enc:") || value.startsWith("op://")
+    private fun isAlreadyProtected(value: String): Boolean = value.startsWith("enc2:") || value.startsWith("enc:") || value.startsWith("op://")
 
     /**
      * Reads the 256-bit master key, creating it if absent.
@@ -99,6 +101,5 @@ object SecretCipher {
     }
 
     /** Lowercase hex encoding. */
-    private fun hex(bytes: ByteArray): String =
-        bytes.joinToString(separator = "") { "%02x".format(it) }
+    private fun hex(bytes: ByteArray): String = bytes.joinToString(separator = "") { "%02x".format(it) }
 }

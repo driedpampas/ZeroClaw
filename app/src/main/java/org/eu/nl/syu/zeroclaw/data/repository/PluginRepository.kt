@@ -6,10 +6,10 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.flow.Flow
 import org.eu.nl.syu.zeroclaw.model.AppSettings
 import org.eu.nl.syu.zeroclaw.model.Plugin
 import org.eu.nl.syu.zeroclaw.model.RemotePlugin
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for plugin management operations.

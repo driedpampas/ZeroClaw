@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.UUID
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.data.channel.ChannelSetupSpec
 import org.eu.nl.syu.zeroclaw.data.channel.ChannelSetupSpecs
 import org.eu.nl.syu.zeroclaw.data.validation.ChannelValidator
@@ -56,8 +58,6 @@ import org.eu.nl.syu.zeroclaw.ui.component.CollapsibleSection
 import org.eu.nl.syu.zeroclaw.ui.component.SecretTextField
 import org.eu.nl.syu.zeroclaw.ui.component.setup.ChannelSetupFlow
 import org.eu.nl.syu.zeroclaw.ui.screen.settings.apikeys.SaveState
-import java.util.UUID
-import kotlinx.coroutines.launch
 
 /** Spacing between form fields. */
 private const val FIELD_SPACING_DP = 12

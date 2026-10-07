@@ -123,8 +123,10 @@ class EstopRepository(
         if (lower.contains("disabled") || lower.contains("not engaged") || lower.contains("inactive")) {
             return false
         }
-        return lower.contains("engaged") || lower.contains("kill-all") ||
-            lower.contains("network-kill") || lower.contains("domain-block") ||
+        return lower.contains("engaged") ||
+            lower.contains("kill-all") ||
+            lower.contains("network-kill") ||
+            lower.contains("domain-block") ||
             lower.contains("tool-freeze")
     }
 

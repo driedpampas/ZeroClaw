@@ -6,9 +6,9 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state
 
+import java.util.TimeZone
 import org.eu.nl.syu.zeroclaw.data.validation.ValidationResult
 import org.eu.nl.syu.zeroclaw.model.ChannelType
-import java.util.TimeZone
 
 /**
  * State for the welcome step.

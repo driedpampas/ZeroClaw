@@ -10,6 +10,10 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ApiKey
 import org.eu.nl.syu.zeroclaw.model.AppSettings
@@ -21,10 +25,6 @@ import org.eu.nl.syu.zeroclaw.service.HealthBridge
 import org.eu.nl.syu.zeroclaw.service.SetupOrchestrator
 import org.eu.nl.syu.zeroclaw.service.engine.EnginePaths
 import org.eu.nl.syu.zeroclaw.util.SecretCipher
-import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /**

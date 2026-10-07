@@ -9,8 +9,8 @@ package org.eu.nl.syu.zeroclaw.data.local.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import org.eu.nl.syu.zeroclaw.data.local.entity.AgentEntity
 import kotlinx.coroutines.flow.Flow
+import org.eu.nl.syu.zeroclaw.data.local.entity.AgentEntity
 
 /**
  * Data access object for agent CRUD operations.

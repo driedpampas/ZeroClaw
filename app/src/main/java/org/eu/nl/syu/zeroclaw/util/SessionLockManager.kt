@@ -8,13 +8,13 @@ package org.eu.nl.syu.zeroclaw.util
 
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import org.eu.nl.syu.zeroclaw.model.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.model.AppSettings
 
 /**
  * Manages app-wide session lock state based on background timeout.

@@ -8,7 +8,6 @@ import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -56,8 +55,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ActivityEvent
 import org.eu.nl.syu.zeroclaw.model.ComponentHealth
@@ -73,7 +74,6 @@ import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
 import org.eu.nl.syu.zeroclaw.util.BatteryOptimization
 import org.eu.nl.syu.zeroclaw.viewmodel.DaemonUiState
 import org.eu.nl.syu.zeroclaw.viewmodel.DaemonViewModel
-import kotlinx.coroutines.launch
 
 /**
  * Aggregated state for the dashboard content composable.
@@ -237,7 +237,7 @@ internal fun DashboardContent(
                 onLearnMore = {
                     val url = BatteryOptimization.getOemInstructionsUrl(oemType)
                     context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+                        Intent(Intent.ACTION_VIEW, url.toUri()),
                     )
                 },
             )

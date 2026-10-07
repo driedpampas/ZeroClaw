@@ -24,9 +24,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.eu.nl.syu.zeroclaw.ui.theme.TerminalTypography
 import org.eu.nl.syu.zeroclaw.util.LocalPowerSaveMode
-import kotlinx.coroutines.delay
 
 /** Braille spinner animation frames matching the Claude Code CLI thinking indicator. */
 private val BRAILLE_FRAMES =

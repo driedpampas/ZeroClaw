@@ -12,6 +12,9 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.eu.nl.syu.zeroclaw.data.local.dao.ActivityEventDao
 import org.eu.nl.syu.zeroclaw.data.local.dao.AgentDao
 import org.eu.nl.syu.zeroclaw.data.local.dao.ConnectedChannelDao
@@ -24,9 +27,6 @@ import org.eu.nl.syu.zeroclaw.data.local.entity.ConnectedChannelEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.LogEntryEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.TerminalEntryEntity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 /**
  * Room database for persistent storage of agents, plugins, log entries,

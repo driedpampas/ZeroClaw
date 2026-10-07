@@ -28,9 +28,12 @@ class VisionBridge(
     /**
      * Sends a vision (image + text) message.
      *
+     * @param text Prompt text (retained for API compatibility; unused until vision transport exists).
+     * @param images Images that would be sent (count reported in the error).
      * @throws EngineException always, until a gateway vision transport exists.
      */
     @Throws(EngineException::class)
+    @Suppress("UnusedParameter")
     suspend fun send(
         text: String,
         images: List<ProcessedImage>,

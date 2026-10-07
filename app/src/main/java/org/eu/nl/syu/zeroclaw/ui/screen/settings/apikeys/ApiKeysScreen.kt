@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.data.StorageHealth
 import org.eu.nl.syu.zeroclaw.data.validation.ProviderValidator
 import org.eu.nl.syu.zeroclaw.data.validation.ValidationResult
@@ -79,7 +80,6 @@ import org.eu.nl.syu.zeroclaw.ui.component.MaskedText
 import org.eu.nl.syu.zeroclaw.ui.component.SecretTextField
 import org.eu.nl.syu.zeroclaw.ui.component.SetupBottomSheet
 import org.eu.nl.syu.zeroclaw.ui.component.setup.ValidationIndicator
-import kotlinx.coroutines.launch
 
 /** Minimum passphrase length required for export/import operations. */
 private const val MIN_PASSPHRASE_LENGTH = 8

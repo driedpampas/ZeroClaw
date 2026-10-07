@@ -3,7 +3,6 @@
 package org.eu.nl.syu.zeroclaw.ui.screen.settings
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +26,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
 
 /** GitHub releases URL for the ZeroClaw-Android project. */
@@ -61,7 +61,7 @@ fun UpdatesScreen(
         ManualUpdateCard(
             onCheckForUpdates = {
                 context.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(RELEASES_URL)),
+                    Intent(Intent.ACTION_VIEW, RELEASES_URL.toUri()),
                 )
             },
         )

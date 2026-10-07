@@ -10,15 +10,15 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import org.eu.nl.syu.zeroclaw.R
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.model.ServiceState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.R
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.model.ServiceState
 
 /**
  * Quick Settings tile that toggles the ZeroClaw daemon on and off.

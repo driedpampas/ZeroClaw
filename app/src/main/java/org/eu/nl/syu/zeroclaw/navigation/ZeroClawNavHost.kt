@@ -25,6 +25,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ServiceState
 import org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService
@@ -71,8 +73,6 @@ import org.eu.nl.syu.zeroclaw.ui.screen.settings.logs.LogViewerScreen
 import org.eu.nl.syu.zeroclaw.ui.screen.settings.memory.MemoryBrowserScreen
 import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupScreen
 import org.eu.nl.syu.zeroclaw.ui.screen.terminal.TerminalScreen
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 /**
  * Single [NavHost] mapping all route objects to their screen composables.

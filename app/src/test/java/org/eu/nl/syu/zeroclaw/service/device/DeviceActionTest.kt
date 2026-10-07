@@ -30,9 +30,10 @@ class DeviceActionTest {
     @Test
     @DisplayName("parses swipe with duration")
     fun `parses swipe with duration`() {
-        val action = DeviceAction.parse(
-            "{\"action\":\"swipe\",\"x1\":1,\"y1\":2,\"x2\":3,\"y2\":4,\"duration_ms\":500}",
-        )
+        val action =
+            DeviceAction.parse(
+                "{\"action\":\"swipe\",\"x1\":1,\"y1\":2,\"x2\":3,\"y2\":4,\"duration_ms\":500}",
+            )
         assertEquals(DeviceAction.Swipe(1, 2, 3, 4, 500), action)
     }
 

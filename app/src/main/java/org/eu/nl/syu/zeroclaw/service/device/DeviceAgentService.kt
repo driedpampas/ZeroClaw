@@ -146,7 +146,9 @@ class DeviceAgentService : Service() {
     }
 
     private fun startForegroundCompat(notification: android.app.Notification) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // FOREGROUND_SERVICE_TYPE_SPECIAL_USE was added in API 34; on older releases
+        // the inlined constant would be unknown to the system, so use the 2-arg overload.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 DeviceAgentNotificationManager.NOTIFICATION_ID,
                 notification,

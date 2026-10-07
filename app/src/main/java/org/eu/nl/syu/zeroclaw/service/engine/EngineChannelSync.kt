@@ -84,7 +84,8 @@ class EngineChannelSync(
 
     /** Reads the engine property schema as a `path -> kind` map. */
     private suspend fun fetchSchemaKinds(): Map<String, String> =
-        client.configList()
+        client
+            .configList()
             .listAt("entries")
             .mapNotNull { entry ->
                 val path = entry.string("path") ?: return@mapNotNull null
@@ -142,7 +143,10 @@ class EngineChannelSync(
     }
 
     /** Converts a stored string value to the JSON type the schema kind expects. */
-    private fun jsonValue(raw: String, kind: String): Any? {
+    private fun jsonValue(
+        raw: String,
+        kind: String,
+    ): Any? {
         val trimmed = raw.trim()
         return when (kind) {
             "bool" ->

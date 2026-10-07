@@ -10,11 +10,6 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.data.remote.OkHttpPluginRegistryClient
-import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
-import org.eu.nl.syu.zeroclaw.model.Plugin
-import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +23,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.data.remote.OkHttpPluginRegistryClient
+import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
+import org.eu.nl.syu.zeroclaw.model.Plugin
+import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
 
 /** Tab index for the installed plugins tab. */
 const val TAB_INSTALLED = 0

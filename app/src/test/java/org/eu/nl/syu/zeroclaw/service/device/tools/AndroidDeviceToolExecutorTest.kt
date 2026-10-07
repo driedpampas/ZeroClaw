@@ -6,10 +6,10 @@
 
 package org.eu.nl.syu.zeroclaw.service.device.tools
 
+import kotlinx.coroutines.runBlocking
 import org.eu.nl.syu.zeroclaw.service.device.DeviceAction
 import org.eu.nl.syu.zeroclaw.service.device.DeviceCommand
 import org.eu.nl.syu.zeroclaw.service.device.DeviceCommandResult
-import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull

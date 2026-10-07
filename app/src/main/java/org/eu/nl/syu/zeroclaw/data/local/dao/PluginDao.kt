@@ -11,8 +11,8 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
-import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
 import kotlinx.coroutines.flow.Flow
+import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
 
 /**
  * Data access object for plugin management operations.

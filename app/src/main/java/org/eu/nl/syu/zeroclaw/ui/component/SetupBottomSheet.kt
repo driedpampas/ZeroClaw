@@ -41,10 +41,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupProgress
 import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupStepStatus
 import org.eu.nl.syu.zeroclaw.util.LocalPowerSaveMode
-import kotlinx.coroutines.flow.StateFlow
 
 /** Icon size for step status indicators in the bottom sheet. */
 private val StepIconSize = 20.dp

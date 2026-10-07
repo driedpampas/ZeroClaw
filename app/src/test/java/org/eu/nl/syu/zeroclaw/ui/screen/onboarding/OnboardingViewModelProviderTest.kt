@@ -6,16 +6,16 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.onboarding
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
 import org.eu.nl.syu.zeroclaw.data.repository.ApiKeyRepository
 import org.eu.nl.syu.zeroclaw.data.repository.OnboardingRepository
 import org.eu.nl.syu.zeroclaw.data.repository.SettingsRepository
 import org.eu.nl.syu.zeroclaw.model.ApiKey
 import org.eu.nl.syu.zeroclaw.model.AppSettings
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName

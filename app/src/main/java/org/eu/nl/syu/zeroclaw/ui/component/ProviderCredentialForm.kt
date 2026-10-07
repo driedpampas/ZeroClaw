@@ -7,7 +7,6 @@
 package org.eu.nl.syu.zeroclaw.ui.component
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import org.eu.nl.syu.zeroclaw.data.ProviderKeyValidator
 import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
 import org.eu.nl.syu.zeroclaw.model.DiscoveredServer
@@ -174,7 +174,7 @@ fun ProviderCredentialForm(
             TextButton(
                 onClick = {
                     context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(providerInfo.keyCreationUrl)),
+                        Intent(Intent.ACTION_VIEW, providerInfo.keyCreationUrl.toUri()),
                     )
                 },
                 enabled = enabled,

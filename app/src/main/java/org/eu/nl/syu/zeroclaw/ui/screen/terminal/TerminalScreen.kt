@@ -65,13 +65,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.model.ProcessedImage
 import org.eu.nl.syu.zeroclaw.model.ServiceState
 import org.eu.nl.syu.zeroclaw.ui.component.LoadingIndicator
 import org.eu.nl.syu.zeroclaw.ui.theme.TerminalTypography
 import org.eu.nl.syu.zeroclaw.util.LocalPowerSaveMode
-import kotlinx.coroutines.launch
 
 /** Horizontal padding inside the input bar. */
 private const val INPUT_BAR_PADDING_DP = 8

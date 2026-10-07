@@ -6,9 +6,9 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.flow.Flow
 import org.eu.nl.syu.zeroclaw.model.ActivityEvent
 import org.eu.nl.syu.zeroclaw.model.ActivityType
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for dashboard activity feed events.

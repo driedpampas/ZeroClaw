@@ -7,17 +7,17 @@
 package org.eu.nl.syu.zeroclaw.repository
 
 import app.cash.turbine.test
-import org.eu.nl.syu.zeroclaw.data.local.dao.PluginDao
-import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
-import org.eu.nl.syu.zeroclaw.data.repository.RoomPluginRepository
-import org.eu.nl.syu.zeroclaw.model.AppSettings
-import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.data.local.dao.PluginDao
+import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
+import org.eu.nl.syu.zeroclaw.data.repository.RoomPluginRepository
+import org.eu.nl.syu.zeroclaw.model.AppSettings
+import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach

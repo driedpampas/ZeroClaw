@@ -6,9 +6,9 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.flow.Flow
 import org.eu.nl.syu.zeroclaw.model.ChannelType
 import org.eu.nl.syu.zeroclaw.model.ConnectedChannel
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for connected channel configuration.

@@ -289,8 +289,14 @@ class DaemonServiceBridge(
      *
      * Identity files are now scaffolded by the engine; this only guarantees the
      * directory survives upgrades.
+     *
+     * @param agentName Retained for call-site compatibility.
+     * @param userName Retained for call-site compatibility.
+     * @param timezone Retained for call-site compatibility.
+     * @param communicationStyle Retained for call-site compatibility.
      */
     @Throws(EngineException::class)
+    @Suppress("UnusedParameter")
     suspend fun ensureWorkspace(
         agentName: String,
         userName: String,
@@ -477,7 +483,7 @@ class DaemonServiceBridge(
      * @param apiKey Optional API key override (not applied here).
      * @return `true` if the config patch was saved.
      */
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "UnusedParameter")
     suspend fun hotSwapProvider(
         provider: String,
         model: String,
@@ -582,7 +588,8 @@ class DaemonServiceBridge(
          */
         internal fun agentAliasFromConfigPath(path: String?): String? {
             if (path == null || !path.startsWith("agents.")) return null
-            return path.removePrefix("agents.")
+            return path
+                .removePrefix("agents.")
                 .substringBefore(".")
                 .takeIf { it.isNotBlank() }
         }

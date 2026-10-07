@@ -6,9 +6,9 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.flow.Flow
 import org.eu.nl.syu.zeroclaw.model.AppSettings
 import org.eu.nl.syu.zeroclaw.model.ThemeMode
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for reading and writing application settings.

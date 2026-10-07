@@ -18,9 +18,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import org.eu.nl.syu.zeroclaw.data.SecurePrefsProvider
-import org.eu.nl.syu.zeroclaw.model.AppSettings
-import org.eu.nl.syu.zeroclaw.model.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +25,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.data.SecurePrefsProvider
+import org.eu.nl.syu.zeroclaw.model.AppSettings
+import org.eu.nl.syu.zeroclaw.model.ThemeMode
 
 /** Extension property providing the singleton [DataStore] for app settings. */
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(

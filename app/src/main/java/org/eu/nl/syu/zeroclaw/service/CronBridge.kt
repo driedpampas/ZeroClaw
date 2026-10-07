@@ -147,10 +147,12 @@ class CronBridge(
             lastRunMs = rfc3339ToEpochMs(string("last_run", "lastRun")),
             lastStatus = string("last_status", "lastStatus"),
             paused = !(bool("enabled") ?: true),
-            oneShot = bool("delete_after_run", "deleteAfterRun") == true ||
-                string("job_type", "jobType") in setOf("one_shot", "oneshot", "one-shot"),
+            oneShot =
+                bool("delete_after_run", "deleteAfterRun") == true ||
+                    string("job_type", "jobType") in setOf("one_shot", "oneshot", "one-shot"),
         )
 
+    /** Constants for [CronBridge]. */
     companion object {
         private const val DEFAULT_AGENT = "default"
     }

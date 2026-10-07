@@ -6,6 +6,7 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.onboarding
 
+import java.util.TimeZone
 import org.eu.nl.syu.zeroclaw.data.validation.ValidationResult
 import org.eu.nl.syu.zeroclaw.model.ChannelType
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.ActivationStepState
@@ -17,7 +18,6 @@ import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.ProviderStepState
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.SecurityStepState
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.TunnelStepState
 import org.eu.nl.syu.zeroclaw.ui.screen.onboarding.state.WelcomeStepState
-import java.util.TimeZone
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull

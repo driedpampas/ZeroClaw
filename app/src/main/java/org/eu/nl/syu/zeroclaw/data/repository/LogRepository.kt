@@ -6,9 +6,9 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.flow.Flow
 import org.eu.nl.syu.zeroclaw.model.LogEntry
 import org.eu.nl.syu.zeroclaw.model.LogSeverity
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for application log entries.

@@ -10,11 +10,11 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.eu.nl.syu.zeroclaw.data.local.ZeroClawDatabase
 import org.eu.nl.syu.zeroclaw.data.local.dao.ActivityEventDao
 import org.eu.nl.syu.zeroclaw.data.local.entity.ActivityEventEntity
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before

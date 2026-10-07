@@ -6,11 +6,11 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
-import org.eu.nl.syu.zeroclaw.model.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.model.AppSettings
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

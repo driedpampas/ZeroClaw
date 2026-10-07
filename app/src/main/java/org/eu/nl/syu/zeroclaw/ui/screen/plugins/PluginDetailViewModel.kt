@@ -9,9 +9,6 @@ package org.eu.nl.syu.zeroclaw.ui.screen.plugins
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
-import org.eu.nl.syu.zeroclaw.model.Plugin
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +20,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
+import org.eu.nl.syu.zeroclaw.model.Plugin
 
 /**
  * ViewModel for the plugin detail screen.

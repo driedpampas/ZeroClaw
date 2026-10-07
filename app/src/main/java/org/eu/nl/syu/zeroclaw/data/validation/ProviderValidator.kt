@@ -6,12 +6,12 @@
 
 package org.eu.nl.syu.zeroclaw.data.validation
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
 import org.eu.nl.syu.zeroclaw.data.remote.ModelFetcher
 import org.eu.nl.syu.zeroclaw.model.ModelListFormat
 import org.eu.nl.syu.zeroclaw.util.LogSanitizer
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Validates provider API keys by probing the provider's model listing endpoint.

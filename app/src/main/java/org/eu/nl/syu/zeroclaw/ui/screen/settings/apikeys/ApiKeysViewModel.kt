@@ -12,8 +12,23 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import java.io.IOException
+import java.security.GeneralSecurityException
+import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.BuildConfig
 import org.eu.nl.syu.zeroclaw.ZeroClawApplication
 import org.eu.nl.syu.zeroclaw.data.CredentialsJsonParser
@@ -38,20 +53,6 @@ import org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService
 import org.eu.nl.syu.zeroclaw.service.engine.EnginePaths
 import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupProgress
 import org.eu.nl.syu.zeroclaw.util.SecretCipher
-import java.io.IOException
-import java.security.GeneralSecurityException
-import java.util.UUID
-import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Persistence state for save/update operations on API keys.
@@ -718,7 +719,7 @@ class ApiKeysViewModel(
                 val port = server.boundPort
                 val url = OpenAiOAuthManager.buildAuthorizeUrl(pkce, port)
                 if (BuildConfig.DEBUG) Log.d(TAG, "OAuth: starting flow on port $port")
-                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
 
                 val callbackResult = server.awaitCallback()
                 bringAppToForeground(context)

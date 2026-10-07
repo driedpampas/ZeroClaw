@@ -18,11 +18,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.eu.nl.syu.zeroclaw.model.ActivityEvent
-import org.eu.nl.syu.zeroclaw.model.ActivityType
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import org.eu.nl.syu.zeroclaw.model.ActivityEvent
+import org.eu.nl.syu.zeroclaw.model.ActivityType
 
 /**
  * Activity feed section for the dashboard showing recent events.

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backs up nothing: mirrors android:allowBackup="false" on pre-Android 12.
+  Paired with data_extraction_rules.xml for API 31+.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+</full-backup-content>

@@ -6,12 +6,12 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.settings
 
-import org.eu.nl.syu.zeroclaw.data.repository.SettingsRepository
-import org.eu.nl.syu.zeroclaw.model.AppSettings
-import org.eu.nl.syu.zeroclaw.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import org.eu.nl.syu.zeroclaw.data.repository.SettingsRepository
+import org.eu.nl.syu.zeroclaw.model.AppSettings
+import org.eu.nl.syu.zeroclaw.model.ThemeMode
 
 /**
  * In-memory [SettingsRepository] for unit tests.

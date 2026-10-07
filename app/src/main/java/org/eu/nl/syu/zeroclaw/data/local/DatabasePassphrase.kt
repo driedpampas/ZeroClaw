@@ -6,10 +6,12 @@
 
 package org.eu.nl.syu.zeroclaw.data.local
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.security.keystore.StrongBoxUnavailableException
 import android.util.Log
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.io.IOException
@@ -114,6 +116,7 @@ object DatabasePassphrase {
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
 
+    @SuppressLint("ApplySharedPref")
     private fun readOrGenerate(prefs: SharedPreferences): String {
         val existing = prefs.getString(KEY_PASSPHRASE, null)
         if (existing != null) {
@@ -123,7 +126,8 @@ object DatabasePassphrase {
         val seed = ByteArray(PASSPHRASE_BYTES)
         SecureRandom().nextBytes(seed)
         val hex = seed.joinToString("") { "%02x".format(it) }
-        prefs.edit().putString(KEY_PASSPHRASE, hex).commit()
+        // Synchronous commit is intentional: losing the passphrase would render the database unreadable.
+        prefs.edit(commit = true) { putString(KEY_PASSPHRASE, hex) }
         return hex
     }
 }

@@ -6,13 +6,13 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import org.eu.nl.syu.zeroclaw.data.local.dao.AgentDao
 import org.eu.nl.syu.zeroclaw.data.local.entity.toEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
 import org.eu.nl.syu.zeroclaw.model.Agent
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 
 /**
  * Room-backed [AgentRepository] implementation.

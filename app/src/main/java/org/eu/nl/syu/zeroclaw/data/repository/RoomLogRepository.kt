@@ -6,15 +6,15 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.eu.nl.syu.zeroclaw.data.local.dao.LogEntryDao
 import org.eu.nl.syu.zeroclaw.data.local.entity.LogEntryEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
 import org.eu.nl.syu.zeroclaw.model.LogEntry
 import org.eu.nl.syu.zeroclaw.model.LogSeverity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 /**
  * Room-backed [LogRepository] implementation.

@@ -79,42 +79,64 @@ class EngineProcessManager(
         withContext(ioDispatcher) {
             lifecycleLock.withLock {
                 if (isRunning) {
-                    Log.i(TAG, "Engine already running (pid=${pid})")
+                    Log.i(TAG, "Engine already running (pid=$pid)")
                     return@withLock
                 }
-                val executable = paths.executable(appContext)
-                if (!executable.canExecute()) {
-                    throw EngineStartException(
-                        "Engine binary is not executable: ${executable.absolutePath}",
-                    )
-                }
-                // Android can leave the engine running after the app process is
-                // killed (force-stop, update, crash). An orphan holds the
-                // daemon's Unix IPC socket, so a new engine's `bind()` fails
-                // with "binding local IPC endpoint". Reap orphans and clear
-                // stale socket artifacts before launching.
-                killOrphanEngines()
-                cleanStaleEndpointArtifacts()
-                ensureWebAssets()
-                if (configToml.isNullOrBlank()) {
-                    ensureBootstrapConfig(host, port)
-                } else {
-                    writeConfiguredToml(configToml, host, port)
-                }
-
+                val executable = requireExecutable()
+                prepareForLaunch(host, port, configToml)
                 val started = launch(executable, host, port, mode)
-                // `daemon` refuses to run when the config has no usable agent or
-                // when security sections were dropped. Fall back to a bare
-                // gateway so the dashboard and config API remain reachable and
-                // the operator can complete setup there.
-                if (mode == MODE_DAEMON && !awaitAlive(started)) {
-                    Log.w(TAG, "daemon mode exited during startup; falling back to gateway mode")
-                    process = null
-                    launch(executable, host, port, MODE_GATEWAY)
-                }
+                maybeFallbackToGateway(started, executable, host, port, mode)
                 Log.i(TAG, "Engine started")
             }
         }
+
+    private fun requireExecutable(): File {
+        val executable = paths.executable(appContext)
+        if (!executable.canExecute()) {
+            throw EngineStartException(
+                "Engine binary is not executable: ${executable.absolutePath}",
+            )
+        }
+        return executable
+    }
+
+    private fun prepareForLaunch(
+        host: String,
+        port: Int,
+        configToml: String?,
+    ) {
+        // Android can leave the engine running after the app process is
+        // killed (force-stop, update, crash). An orphan holds the
+        // daemon's Unix IPC socket, so a new engine's `bind()` fails
+        // with "binding local IPC endpoint". Reap orphans and clear
+        // stale socket artifacts before launching.
+        killOrphanEngines()
+        cleanStaleEndpointArtifacts()
+        ensureWebAssets()
+        if (configToml.isNullOrBlank()) {
+            ensureBootstrapConfig(host, port)
+        } else {
+            writeConfiguredToml(configToml, host, port)
+        }
+    }
+
+    private suspend fun maybeFallbackToGateway(
+        started: Process,
+        executable: File,
+        host: String,
+        port: Int,
+        mode: String,
+    ) {
+        // `daemon` refuses to run when the config has no usable agent or
+        // when security sections were dropped. Fall back to a bare
+        // gateway so the dashboard and config API remain reachable and
+        // the operator can complete setup there.
+        if (mode == MODE_DAEMON && !awaitAlive(started)) {
+            Log.w(TAG, "daemon mode exited during startup; falling back to gateway mode")
+            process = null
+            launch(executable, host, port, MODE_GATEWAY)
+        }
+    }
 
     private fun launch(
         executable: File,
@@ -254,7 +276,10 @@ class EngineProcessManager(
         marker.writeText(targetVersion)
     }
 
-    private fun copyAssetTree(assetPath: String, targetDir: File) {
+    private fun copyAssetTree(
+        assetPath: String,
+        targetDir: File,
+    ) {
         val children = appContext.assets.list(assetPath).orEmpty()
         if (children.isEmpty()) {
             // Leaf asset: copy the file.
@@ -275,7 +300,10 @@ class EngineProcessManager(
      * app depends on (loopback bind + dashboard path) without touching any
      * other operator-managed key.
      */
-    private fun ensureBootstrapConfig(host: String, port: Int) {
+    private fun ensureBootstrapConfig(
+        host: String,
+        port: Int,
+    ) {
         paths.configDir.mkdirs()
         val config = paths.configFile
         val webDir = paths.webDir.absolutePath
@@ -322,7 +350,11 @@ class EngineProcessManager(
      * @param host Loopback host to bind.
      * @param port Gateway port.
      */
-    private fun writeConfiguredToml(configToml: String, host: String, port: Int) {
+    private fun writeConfiguredToml(
+        configToml: String,
+        host: String,
+        port: Int,
+    ) {
         paths.configDir.mkdirs()
         val body =
             buildString {
@@ -340,7 +372,11 @@ class EngineProcessManager(
      * missing required keys are inserted at the top of the section. TOML permits
      * keys in any order within a table, so no existing keys are disturbed.
      */
-    private fun enforceGatewayKeys(config: String, host: String, port: Int): String {
+    private fun enforceGatewayKeys(
+        config: String,
+        host: String,
+        port: Int,
+    ): String {
         val webDir = paths.webDir.absolutePath
         val lines = config.lines().toMutableList()
         val headerIdx = lines.indexOfFirst { it.trim() == "[gateway]" }
@@ -391,13 +427,18 @@ class EngineProcessManager(
         cause: Throwable? = null,
     ) : IOException(message, cause)
 
+    /** Constants for [EngineProcessManager]. */
     companion object {
         private const val TAG = "EngineProcessManager"
         private const val DEFAULT_HOST = "127.0.0.1"
 
         /** Upstream default gateway port. */
         const val DEFAULT_PORT = 42617
+
+        /** Engine mode running gateway, channels and scheduler. */
         const val MODE_DAEMON = "daemon"
+
+        /** Engine mode running gateway only. */
         const val MODE_GATEWAY = "gateway"
         private const val DEFAULT_GRACE_MILLIS = 5_000L
         private const val START_SETTLE_MS = 1_500L

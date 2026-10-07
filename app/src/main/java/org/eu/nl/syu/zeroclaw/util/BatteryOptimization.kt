@@ -6,12 +6,13 @@
 
 package org.eu.nl.syu.zeroclaw.util
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.net.toUri
 
 /**
  * Utilities for detecting and managing battery optimization exemptions.
@@ -52,11 +53,15 @@ object BatteryOptimization {
      * @param context Application context for reading the package name.
      * @return An intent targeting
      *   [Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS].
+     *
+     * The exemption is user-initiated from Settings to keep the local AI daemon alive;
+     * this is not for Play distribution where the policy applies.
      */
+    @SuppressLint("BatteryLife")
     fun requestExemptionIntent(context: Context): Intent =
         Intent(
             Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-            Uri.parse("package:${context.packageName}"),
+            "package:${context.packageName}".toUri(),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**

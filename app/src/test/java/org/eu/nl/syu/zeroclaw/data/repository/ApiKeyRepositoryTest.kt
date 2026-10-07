@@ -6,10 +6,10 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
-import org.eu.nl.syu.zeroclaw.model.ApiKey
-import org.eu.nl.syu.zeroclaw.model.KeyStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.model.ApiKey
+import org.eu.nl.syu.zeroclaw.model.KeyStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull

@@ -132,10 +132,12 @@ class ZeroClawAccessibilityService : AccessibilityService() {
         command: DeviceCommand,
         future: CompletableFuture<DeviceCommandResult>,
     ) {
-        val duration = command.durationMs.coerceIn(
-            DeviceAction.Swipe.MIN_SWIPE_MS,
-            DeviceAction.Swipe.MAX_SWIPE_MS,
-        ).toLong()
+        val duration =
+            command.durationMs
+                .coerceIn(
+                    DeviceAction.Swipe.MIN_SWIPE_MS,
+                    DeviceAction.Swipe.MAX_SWIPE_MS,
+                ).toLong()
         val path =
             Path().apply {
                 moveTo(command.x.toFloat(), command.y.toFloat())
@@ -163,11 +165,14 @@ class ZeroClawAccessibilityService : AccessibilityService() {
     private fun handleClickNode(command: DeviceCommand): DeviceCommandResult {
         val root = rootInActiveWindow ?: return DeviceCommandResult.error("NO_WINDOW")
         return try {
-            val target = findNode(root, command.resourceId, command.nodeText)
-                ?: return DeviceCommandResult.error("NODE_NOT_FOUND")
+            val target =
+                findNode(root, command.resourceId, command.nodeText)
+                    ?: return DeviceCommandResult.error("NODE_NOT_FOUND")
             val clicked = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             target.recycle()
-            if (clicked) DeviceCommandResult.success("{\"action\":\"click_node\"}") else {
+            if (clicked) {
+                DeviceCommandResult.success("{\"action\":\"click_node\"}")
+            } else {
                 DeviceCommandResult.error("CLICK_FAILED")
             }
         } finally {
@@ -185,15 +190,18 @@ class ZeroClawAccessibilityService : AccessibilityService() {
                 } else {
                     findFocusedEditable(root) ?: return DeviceCommandResult.error("NO_FOCUSED_FIELD")
                 }
-            val args = Bundle().apply {
-                putCharSequence(
-                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                    command.text,
-                )
-            }
+            val args =
+                Bundle().apply {
+                    putCharSequence(
+                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                        command.text,
+                    )
+                }
             val set = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
             target.recycle()
-            if (set) DeviceCommandResult.success("{\"action\":\"set_text\"}") else {
+            if (set) {
+                DeviceCommandResult.success("{\"action\":\"set_text\"}")
+            } else {
                 DeviceCommandResult.error("SET_TEXT_FAILED")
             }
         } finally {

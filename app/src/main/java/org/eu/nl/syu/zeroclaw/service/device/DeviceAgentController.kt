@@ -310,11 +310,12 @@ object DeviceAgentController {
     /**
      * Runs one Perceive → Reason → Act iteration.
      *
+     * Guard clauses keep each pause/stop checkpoint explicit; the
+     * alternative (nested conditionals) hurts the pause audit.
+     *
      * @return `false` when a terminal state was reached and the loop
      *   must stop; `true` to continue.
      */
-    // Guard clauses keep each pause/stop checkpoint explicit; the
-    // alternative (nested conditionals) hurts the pause audit.
     @Suppress("ReturnCount")
     private suspend fun runOneIteration(
         goal: String,
@@ -347,9 +348,12 @@ object DeviceAgentController {
         return true
     }
 
-    /** Perceives the screen; reports failure and returns null on error. */
-    // Hooks are injectable lambdas that may throw anything; the loop must
-    // degrade to a structured TASK_ERROR, never crash (cancellation still rethrown).
+    /**
+     * Perceives the screen; reports failure and returns null on error.
+     *
+     * Hooks are injectable lambdas that may throw anything; the loop must
+     * degrade to a structured TASK_ERROR, never crash (cancellation still rethrown).
+     */
     @Suppress("TooGenericExceptionCaught")
     private suspend fun perceiveOrFail(): UiSnapshot? =
         try {
@@ -362,8 +366,11 @@ object DeviceAgentController {
             null
         }
 
-    /** Reasons the next action; degrades to [DeviceAction.NoOp]. */
-    // Model output handling must never throw; malformed responses become no-ops.
+    /**
+     * Reasons the next action; degrades to [DeviceAction.NoOp].
+     *
+     * Model output handling must never throw; malformed responses become no-ops.
+     */
     @Suppress("TooGenericExceptionCaught")
     private suspend fun reasonOrNoOp(input: ReasonInput): DeviceAction =
         try {
@@ -374,8 +381,11 @@ object DeviceAgentController {
             DeviceAction.NoOp
         }
 
-    /** Logs and dispatches one action; act errors yield failure, never stop the loop. */
-    // Injectable executors may throw anything; one failed tool must not abort the task.
+    /**
+     * Logs and dispatches one action; act errors yield failure, never stop the loop.
+     *
+     * Injectable executors may throw anything; one failed tool must not abort the task.
+     */
     @Suppress("TooGenericExceptionCaught")
     private suspend fun dispatch(action: DeviceAction): ToolOutcome {
         emit(DeviceEvent.ActionDispatched(action.eventName, stepsExecuted))

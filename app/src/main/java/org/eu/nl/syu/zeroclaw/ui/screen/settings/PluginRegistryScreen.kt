@@ -34,11 +34,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
-import org.eu.nl.syu.zeroclaw.ui.component.SettingsToggleRow
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import org.eu.nl.syu.zeroclaw.ui.component.SectionHeader
+import org.eu.nl.syu.zeroclaw.ui.component.SettingsToggleRow
 
 /**
  * Plugin registry sync configuration screen.

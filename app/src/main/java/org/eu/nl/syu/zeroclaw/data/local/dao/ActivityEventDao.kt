@@ -9,8 +9,8 @@ package org.eu.nl.syu.zeroclaw.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import org.eu.nl.syu.zeroclaw.data.local.entity.ActivityEventEntity
 import kotlinx.coroutines.flow.Flow
+import org.eu.nl.syu.zeroclaw.data.local.entity.ActivityEventEntity
 
 /**
  * Data access object for activity feed event operations.

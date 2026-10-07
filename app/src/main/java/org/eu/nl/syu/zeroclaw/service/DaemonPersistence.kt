@@ -6,8 +6,10 @@
 
 package org.eu.nl.syu.zeroclaw.service
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import org.eu.nl.syu.zeroclaw.data.SecurePrefsProvider
 
 /**
@@ -74,21 +76,20 @@ class DaemonPersistence(
      * @param host Gateway bind address (e.g. "127.0.0.1").
      * @param port Gateway bind port.
      */
+    @SuppressLint("ApplySharedPref")
     fun recordRunning(
         configToml: String,
         host: String,
         port: UShort,
     ) {
-        securePrefs
-            .edit()
-            .putString(KEY_CONFIG_TOML, configToml)
-            .commit()
-        plainPrefs
-            .edit()
-            .putBoolean(KEY_WAS_RUNNING, true)
-            .putString(KEY_HOST, host)
-            .putInt(KEY_PORT, port.toInt())
-            .commit()
+        // Synchronous commits are intentional: daemon recovery after process death
+        // requires data on disk before returning.
+        securePrefs.edit(commit = true) { putString(KEY_CONFIG_TOML, configToml) }
+        plainPrefs.edit(commit = true) {
+            putBoolean(KEY_WAS_RUNNING, true)
+            putString(KEY_HOST, host)
+            putInt(KEY_PORT, port.toInt())
+        }
     }
 
     /**
@@ -103,17 +104,14 @@ class DaemonPersistence(
      * the two commits, the stale config in secure storage is harmless
      * (the flag is already `false`).
      */
+    @SuppressLint("ApplySharedPref")
     fun recordStopped() {
-        plainPrefs
-            .edit()
-            .putBoolean(KEY_WAS_RUNNING, false)
-            .remove(KEY_HOST)
-            .remove(KEY_PORT)
-            .commit()
-        securePrefs
-            .edit()
-            .remove(KEY_CONFIG_TOML)
-            .commit()
+        plainPrefs.edit(commit = true) {
+            putBoolean(KEY_WAS_RUNNING, false)
+            remove(KEY_HOST)
+            remove(KEY_PORT)
+        }
+        securePrefs.edit(commit = true) { remove(KEY_CONFIG_TOML) }
     }
 
     /**

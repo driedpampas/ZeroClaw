@@ -121,28 +121,28 @@ class EventBridge(
  * @receiver The daemon event to convert.
  * @return Pair of [ActivityType] and formatted message string.
  */
-private fun DaemonEvent.toActivityRecord(): Pair<ActivityType, String> {
-    val type =
-        when (kind) {
-            "error" -> ActivityType.DAEMON_ERROR
-            else -> ActivityType.FFI_CALL
-        }
-    val message =
-        when (kind) {
-            "llm_request" -> "LLM Request: ${data["provider"]} / ${data["model"]}"
-            "llm_response" -> "LLM Response: ${data["provider"]} (${data["duration_ms"]}ms)"
-            "tool_call" -> "Tool: ${data["tool"]} (${data["duration_ms"]}ms)"
-            "tool_call_start" -> "Tool Starting: ${data["tool"]}"
-            "channel_message" -> "Channel: ${data["channel"]} (${data["direction"]})"
-            "error" -> "Error: ${data["component"]} — ${sanitizeActivityMessage(data["message"])}"
-            "heartbeat_tick" -> "Heartbeat"
-            "turn_complete" -> "Turn Complete"
-            "agent_start" -> "Agent Start: ${data["provider"]} / ${data["model"]}"
-            "agent_end" -> "Agent End (${data["duration_ms"]}ms)"
-            else -> data["message"]?.takeIf { it.isNotBlank() }?.let { "Event: $it" } ?: "Event: $kind"
-        }
-    return type to message
-}
+private fun DaemonEvent.toActivityRecord(): Pair<ActivityType, String> = toActivityType() to toActivityMessage()
+
+private fun DaemonEvent.toActivityType(): ActivityType =
+    when (kind) {
+        "error" -> ActivityType.DAEMON_ERROR
+        else -> ActivityType.FFI_CALL
+    }
+
+private fun DaemonEvent.toActivityMessage(): String =
+    when (kind) {
+        "llm_request" -> "LLM Request: ${data["provider"]} / ${data["model"]}"
+        "llm_response" -> "LLM Response: ${data["provider"]} (${data["duration_ms"]}ms)"
+        "tool_call" -> "Tool: ${data["tool"]} (${data["duration_ms"]}ms)"
+        "tool_call_start" -> "Tool Starting: ${data["tool"]}"
+        "channel_message" -> "Channel: ${data["channel"]} (${data["direction"]})"
+        "error" -> "Error: ${data["component"]} — ${sanitizeActivityMessage(data["message"])}"
+        "heartbeat_tick" -> "Heartbeat"
+        "turn_complete" -> "Turn Complete"
+        "agent_start" -> "Agent Start: ${data["provider"]} / ${data["model"]}"
+        "agent_end" -> "Agent End (${data["duration_ms"]}ms)"
+        else -> data["message"]?.takeIf { it.isNotBlank() }?.let { "Event: $it" } ?: "Event: $kind"
+    }
 
 /** Maximum length for error messages recorded in the activity feed. */
 private const val MAX_ACTIVITY_MESSAGE_LENGTH = 120

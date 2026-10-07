@@ -47,6 +47,7 @@ data class EnginePaths(
         return File(dir, ENGINE_BINARY_NAME)
     }
 
+    /** Constants and factory helpers for [EnginePaths]. */
     companion object {
         /** Native-library filename of the bundled engine executable. */
         const val ENGINE_BINARY_NAME = "libzeroclaw_engine.so"

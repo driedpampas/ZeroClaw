@@ -6,8 +6,8 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
-import org.eu.nl.syu.zeroclaw.model.TerminalEntry
 import kotlinx.coroutines.flow.Flow
+import org.eu.nl.syu.zeroclaw.model.TerminalEntry
 
 /**
  * Repository interface for terminal REPL history entries.

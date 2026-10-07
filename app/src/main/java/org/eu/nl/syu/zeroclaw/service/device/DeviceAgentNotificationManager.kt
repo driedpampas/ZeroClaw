@@ -112,11 +112,12 @@ class DeviceAgentNotificationManager(
                 },
                 PendingIntent.FLAG_IMMUTABLE,
             )
-        return NotificationCompat.Action.Builder(
-            R.drawable.ic_stop,
-            context.getString(R.string.device_agent_action_pause),
-            intent,
-        ).build()
+        return NotificationCompat.Action
+            .Builder(
+                R.drawable.ic_stop,
+                context.getString(R.string.device_agent_action_pause),
+                intent,
+            ).build()
     }
 
     private fun actionResume(): NotificationCompat.Action {
@@ -129,11 +130,12 @@ class DeviceAgentNotificationManager(
                 },
                 PendingIntent.FLAG_IMMUTABLE,
             )
-        return NotificationCompat.Action.Builder(
-            R.drawable.ic_retry,
-            context.getString(R.string.device_agent_action_resume),
-            intent,
-        ).build()
+        return NotificationCompat.Action
+            .Builder(
+                R.drawable.ic_retry,
+                context.getString(R.string.device_agent_action_resume),
+                intent,
+            ).build()
     }
 
     private fun actionStop(): NotificationCompat.Action {
@@ -146,11 +148,12 @@ class DeviceAgentNotificationManager(
                 },
                 PendingIntent.FLAG_IMMUTABLE,
             )
-        return NotificationCompat.Action.Builder(
-            R.drawable.ic_stop,
-            context.getString(R.string.device_agent_action_stop),
-            intent,
-        ).build()
+        return NotificationCompat.Action
+            .Builder(
+                R.drawable.ic_stop,
+                context.getString(R.string.device_agent_action_stop),
+                intent,
+            ).build()
     }
 
     private fun statusText(

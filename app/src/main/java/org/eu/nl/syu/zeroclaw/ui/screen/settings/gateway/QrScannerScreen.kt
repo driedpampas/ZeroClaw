@@ -7,6 +7,7 @@
 package org.eu.nl.syu.zeroclaw.ui.screen.settings.gateway
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,6 +59,11 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+
+@SuppressLint("UnsafeOptInUsageError")
+private fun extractMediaImage(
+    imageProxy: androidx.camera.core.ImageProxy,
+): android.media.Image? = imageProxy.image
 
 /**
  * Internal state of the QR scanner screen.
@@ -291,7 +297,7 @@ private fun CameraScanContent(
                                                 imageProxy.close()
                                                 return@setAnalyzer
                                             }
-                                            val mediaImage = imageProxy.image
+                                            val mediaImage = extractMediaImage(imageProxy)
                                             if (mediaImage != null) {
                                                 val inputImage =
                                                     InputImage.fromMediaImage(

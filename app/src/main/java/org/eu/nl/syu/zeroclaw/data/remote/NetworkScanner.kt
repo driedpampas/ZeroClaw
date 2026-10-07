@@ -8,9 +8,6 @@ package org.eu.nl.syu.zeroclaw.data.remote
 
 import android.content.Context
 import android.net.ConnectivityManager
-import org.eu.nl.syu.zeroclaw.model.DiscoveredServer
-import org.eu.nl.syu.zeroclaw.model.LocalServerType
-import org.eu.nl.syu.zeroclaw.model.ScanState
 import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -25,6 +22,9 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import org.eu.nl.syu.zeroclaw.model.DiscoveredServer
+import org.eu.nl.syu.zeroclaw.model.LocalServerType
+import org.eu.nl.syu.zeroclaw.model.ScanState
 import org.json.JSONObject
 
 /**

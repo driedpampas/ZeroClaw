@@ -6,8 +6,8 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
-import org.eu.nl.syu.zeroclaw.model.Agent
 import kotlinx.coroutines.flow.Flow
+import org.eu.nl.syu.zeroclaw.model.Agent
 
 /**
  * Repository interface for agent CRUD operations.

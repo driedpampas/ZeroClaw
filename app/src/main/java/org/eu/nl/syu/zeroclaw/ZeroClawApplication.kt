@@ -21,6 +21,17 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.request.crossfade
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
 import org.eu.nl.syu.zeroclaw.data.SecurePrefsProvider
 import org.eu.nl.syu.zeroclaw.data.StorageHealth
 import org.eu.nl.syu.zeroclaw.data.local.ZeroClawDatabase
@@ -57,17 +68,6 @@ import org.eu.nl.syu.zeroclaw.service.SkillsBridge
 import org.eu.nl.syu.zeroclaw.service.ToolsBridge
 import org.eu.nl.syu.zeroclaw.service.VisionBridge
 import org.eu.nl.syu.zeroclaw.util.SessionLockManager
-import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import okhttp3.ConnectionPool
-import okhttp3.OkHttpClient
 
 /**
  * Application subclass that initialises the native ZeroClaw library and

@@ -22,16 +22,28 @@ import org.eu.nl.syu.zeroclaw.util.LogSanitizer
  */
 sealed class StreamEvent {
     /** A chunk of thinking/reasoning tokens from the model. */
-    data class ThinkingChunk(val text: String) : StreamEvent()
+    data class ThinkingChunk(
+        /** Thinking text chunk. */
+        val text: String,
+    ) : StreamEvent()
 
     /** A chunk of response content tokens from the model. */
-    data class ResponseChunk(val text: String) : StreamEvent()
+    data class ResponseChunk(
+        /** Response text chunk. */
+        val text: String,
+    ) : StreamEvent()
 
     /** The stream completed successfully. */
-    data class Complete(val fullResponse: String) : StreamEvent()
+    data class Complete(
+        /** Full accumulated response text. */
+        val fullResponse: String,
+    ) : StreamEvent()
 
     /** An error occurred during streaming. */
-    data class Error(val message: String) : StreamEvent()
+    data class Error(
+        /** Human-readable error message. */
+        val message: String,
+    ) : StreamEvent()
 }
 
 /**
@@ -82,6 +94,7 @@ class StreamingBridge(
         }
     }
 
+    /** Constants for [StreamingBridge]. */
     companion object {
         private const val TAG = "StreamingBridge"
         private const val BUFFER_CAPACITY = 256

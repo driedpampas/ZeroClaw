@@ -12,20 +12,6 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import org.eu.nl.syu.zeroclaw.ZeroClawApplication
-import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
-import org.eu.nl.syu.zeroclaw.model.AppSettings
-import org.eu.nl.syu.zeroclaw.model.LogSeverity
-import org.eu.nl.syu.zeroclaw.model.ProcessedImage
-import org.eu.nl.syu.zeroclaw.model.ProviderAuthType
-import org.eu.nl.syu.zeroclaw.model.RefreshCommand
-import org.eu.nl.syu.zeroclaw.model.TerminalEntry
-import org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService
-import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
-import org.eu.nl.syu.zeroclaw.util.ImageProcessor
-import org.eu.nl.syu.zeroclaw.BuildConfig
-import org.eu.nl.syu.zeroclaw.service.engine.EngineException
-import org.eu.nl.syu.zeroclaw.service.engine.GatewayClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,6 +26,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.eu.nl.syu.zeroclaw.BuildConfig
+import org.eu.nl.syu.zeroclaw.ZeroClawApplication
+import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
+import org.eu.nl.syu.zeroclaw.model.AppSettings
+import org.eu.nl.syu.zeroclaw.model.LogSeverity
+import org.eu.nl.syu.zeroclaw.model.ProcessedImage
+import org.eu.nl.syu.zeroclaw.model.ProviderAuthType
+import org.eu.nl.syu.zeroclaw.model.RefreshCommand
+import org.eu.nl.syu.zeroclaw.model.TerminalEntry
+import org.eu.nl.syu.zeroclaw.service.ZeroClawDaemonService
+import org.eu.nl.syu.zeroclaw.service.engine.EngineException
+import org.eu.nl.syu.zeroclaw.service.engine.GatewayClient
+import org.eu.nl.syu.zeroclaw.util.ErrorSanitizer
+import org.eu.nl.syu.zeroclaw.util.ImageProcessor
 
 /**
  * ViewModel for the terminal REPL screen.
@@ -314,30 +314,26 @@ class TerminalViewModel(
      */
     private suspend fun evaluateAdminExpression(expression: String): String? {
         val head = expression.trim().substringBefore("(").trim()
-        return try {
-            val result =
-                when (head) {
-                    "status" -> gateway.status()
-                    "version" -> gateway.versionCheck()
-                    "health", "health_component" -> gateway.health()
-                    "config" -> gateway.configList()
-                    "tools" -> gateway.tools()
-                    "cost", "cost_daily", "cost_monthly" -> gateway.cost()
-                    "events", "traces", "traces_filter" -> gateway.logs()
-                    "cron_list", "cron_get", "cron_add", "cron_oneshot",
-                    "cron_remove", "cron_pause", "cron_resume",
-                    "cron_add_at", "cron_add_every",
-                    -> gateway.cron()
-                    "memories", "memories_by_category", "memory_recall",
-                    "memory_forget", "memory_count",
-                    -> gateway.memory()
-                    "skills" -> gateway.skillBundles()
-                    else -> return null
-                }
-            result.toString(2)
-        } catch (e: Exception) {
-            throw e
-        }
+        val result =
+            when (head) {
+                "status" -> gateway.status()
+                "version" -> gateway.versionCheck()
+                "health", "health_component" -> gateway.health()
+                "config" -> gateway.configList()
+                "tools" -> gateway.tools()
+                "cost", "cost_daily", "cost_monthly" -> gateway.cost()
+                "events", "traces", "traces_filter" -> gateway.logs()
+                "cron_list", "cron_get", "cron_add", "cron_oneshot",
+                "cron_remove", "cron_pause", "cron_resume",
+                "cron_add_at", "cron_add_every",
+                -> gateway.cron()
+                "memories", "memories_by_category", "memory_recall",
+                "memory_forget", "memory_count",
+                -> gateway.memory()
+                "skills" -> gateway.skillBundles()
+                else -> return null
+            }
+        return result.toString(2)
     }
 
     /**
@@ -392,9 +388,9 @@ class TerminalViewModel(
      * provider can convert them to multimodal content parts.
      *
      * @param message The message text to send to the agent.
-     * @param images Attached images to include in the request.
+     * @param images Attached images (currently unused; gateway transport is text-only).
      */
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "UnusedParameter")
     private fun executeAgentTurn(
         message: String,
         images: List<ProcessedImage> = emptyList(),

@@ -7,6 +7,11 @@
 package org.eu.nl.syu.zeroclaw.data.repository
 
 import android.util.Log
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.eu.nl.syu.zeroclaw.data.local.dao.PluginDao
 import org.eu.nl.syu.zeroclaw.data.local.entity.PluginEntity
 import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
@@ -14,11 +19,6 @@ import org.eu.nl.syu.zeroclaw.model.AppSettings
 import org.eu.nl.syu.zeroclaw.model.OfficialPlugins
 import org.eu.nl.syu.zeroclaw.model.Plugin
 import org.eu.nl.syu.zeroclaw.model.RemotePlugin
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * Room-backed [PluginRepository] implementation.

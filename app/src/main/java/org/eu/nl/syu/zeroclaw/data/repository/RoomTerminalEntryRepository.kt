@@ -6,16 +6,16 @@
 
 package org.eu.nl.syu.zeroclaw.data.repository
 
-import org.eu.nl.syu.zeroclaw.data.local.dao.TerminalEntryDao
-import org.eu.nl.syu.zeroclaw.data.local.entity.TerminalEntryEntity
-import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
-import org.eu.nl.syu.zeroclaw.model.TerminalEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.eu.nl.syu.zeroclaw.data.local.dao.TerminalEntryDao
+import org.eu.nl.syu.zeroclaw.data.local.entity.TerminalEntryEntity
+import org.eu.nl.syu.zeroclaw.data.local.entity.toModel
+import org.eu.nl.syu.zeroclaw.model.TerminalEntry
 
 /**
  * Room-backed [TerminalEntryRepository] implementation.

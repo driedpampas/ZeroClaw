@@ -6,15 +6,15 @@
 
 package org.eu.nl.syu.zeroclaw.ui.screen.plugins
 
-import org.eu.nl.syu.zeroclaw.data.repository.PluginRepository
-import org.eu.nl.syu.zeroclaw.model.Plugin
-import org.eu.nl.syu.zeroclaw.model.PluginCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
+import org.eu.nl.syu.zeroclaw.data.repository.PluginRepository
+import org.eu.nl.syu.zeroclaw.model.Plugin
+import org.eu.nl.syu.zeroclaw.model.PluginCategory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName

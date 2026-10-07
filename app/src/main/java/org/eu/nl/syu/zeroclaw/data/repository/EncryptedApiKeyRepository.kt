@@ -9,17 +9,18 @@ package org.eu.nl.syu.zeroclaw.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
-import org.eu.nl.syu.zeroclaw.data.SecurePrefsProvider
-import org.eu.nl.syu.zeroclaw.data.StorageHealth
-import org.eu.nl.syu.zeroclaw.model.ApiKey
-import org.eu.nl.syu.zeroclaw.model.KeyStatus
+import androidx.core.content.edit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.eu.nl.syu.zeroclaw.data.ProviderRegistry
+import org.eu.nl.syu.zeroclaw.data.SecurePrefsProvider
+import org.eu.nl.syu.zeroclaw.data.StorageHealth
+import org.eu.nl.syu.zeroclaw.model.ApiKey
+import org.eu.nl.syu.zeroclaw.model.KeyStatus
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -93,7 +94,7 @@ class EncryptedApiKeyRepository(
     }
 
     override suspend fun delete(id: String) {
-        prefs.edit().remove(id).apply()
+        prefs.edit { remove(id) }
         _keys.value = _keys.value.filter { it.id != id }
     }
 
@@ -194,7 +195,7 @@ class EncryptedApiKeyRepository(
                 put(JSON_KEY_REFRESH_TOKEN, apiKey.refreshToken)
                 put(JSON_KEY_EXPIRES_AT, apiKey.expiresAt)
             }
-        prefs.edit().putString(apiKey.id, json.toString()).apply()
+        prefs.edit { putString(apiKey.id, json.toString()) }
     }
 
     @Suppress("TooGenericExceptionCaught")

@@ -63,8 +63,7 @@ data class DeviceCommand private constructor(
     /** Low-level command factories mirroring the DroidClaw command set. */
     companion object {
         /** Reads the UI tree up to [depth]. */
-        fun getUiTree(depth: Int = UiTreeSerializer.DEFAULT_MAX_DEPTH): DeviceCommand =
-            DeviceCommand(type = Type.GET_UI_TREE, depth = depth)
+        fun getUiTree(depth: Int = UiTreeSerializer.DEFAULT_MAX_DEPTH): DeviceCommand = DeviceCommand(type = Type.GET_UI_TREE, depth = depth)
 
         /** Taps at ([x], [y]). */
         fun tapAt(
@@ -102,8 +101,7 @@ data class DeviceCommand private constructor(
         ): DeviceCommand = DeviceCommand(type = Type.CLICK_NODE, resourceId = resourceId, nodeText = text)
 
         /** Performs global action [actionId]. */
-        fun globalAction(actionId: Int): DeviceCommand =
-            DeviceCommand(type = Type.GLOBAL_ACTION, globalAction = actionId)
+        fun globalAction(actionId: Int): DeviceCommand = DeviceCommand(type = Type.GLOBAL_ACTION, globalAction = actionId)
 
         /**
          * Maps an LLM-level [DeviceAction] to an executor-level command.
@@ -146,11 +144,9 @@ data class DeviceCommandResult(
     /** Result factories for command outcomes. */
     companion object {
         /** Successful result with optional [payload]. */
-        fun success(payload: String? = null): DeviceCommandResult =
-            DeviceCommandResult(success = true, payload = payload)
+        fun success(payload: String? = null): DeviceCommandResult = DeviceCommandResult(success = true, payload = payload)
 
         /** Failed result with an [error] code. */
-        fun error(error: String): DeviceCommandResult =
-            DeviceCommandResult(success = false, error = error)
+        fun error(error: String): DeviceCommandResult = DeviceCommandResult(success = false, error = error)
     }
 }

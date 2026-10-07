@@ -39,14 +39,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import org.eu.nl.syu.zeroclaw.ui.component.CategoryBadge
 import org.eu.nl.syu.zeroclaw.ui.component.CollapsibleSection
 import org.eu.nl.syu.zeroclaw.ui.component.LoadingIndicator
 import org.eu.nl.syu.zeroclaw.ui.component.OfficialPluginBadge
 import org.eu.nl.syu.zeroclaw.ui.screen.settings.SettingsViewModel
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.drop
 
 /**
  * Plugin detail screen showing full information, install/enable controls,

@@ -9,17 +9,16 @@ package org.eu.nl.syu.zeroclaw.service
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupProgress
-import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupStepStatus
-import org.eu.nl.syu.zeroclaw.service.engine.EngineException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.eu.nl.syu.zeroclaw.service.engine.EngineException
+import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupProgress
+import org.eu.nl.syu.zeroclaw.ui.screen.setup.SetupStepStatus
 
 /**
  * Drives the daemon setup pipeline with polling-based health verification.
