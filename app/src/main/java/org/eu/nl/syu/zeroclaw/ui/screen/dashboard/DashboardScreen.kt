@@ -267,6 +267,8 @@ internal fun DashboardContent(
             onStop = onStopDaemon,
         )
 
+        DeviceControlCard()
+
         if (state.serviceState == ServiceState.RUNNING) {
             state.healthDetail?.let { detail ->
                 ComponentHealthRow(healthDetail = detail)

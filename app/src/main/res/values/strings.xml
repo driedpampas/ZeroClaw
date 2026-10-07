@@ -12,4 +12,20 @@
     <string name="notification_status_running">Running</string>
     <string name="notification_status_stopping">Stopping\u2026</string>
     <string name="notification_status_error">Error</string>
+
+    <string name="accessibility_service_label">ZeroClaw on-device agent</string>
+    <string name="accessibility_service_description">Lets the ZeroClaw agent read the screen and perform taps, swipes, and typing to complete tasks on-device.</string>
+
+    <string name="device_agent_channel_name">On-device agent</string>
+    <string name="device_agent_channel_description">Ongoing notification for the ZeroClaw on-device agent</string>
+    <string name="device_agent_title">ZeroClaw Agent</string>
+    <string name="device_agent_action_pause">Pause</string>
+    <string name="device_agent_action_resume">Resume</string>
+    <string name="device_agent_action_stop">Stop</string>
+    <string name="device_agent_status_active">Agent active — step %1$d of %2$d</string>
+    <string name="device_agent_status_paused">Agent paused. Tap to resume.</string>
+    <string name="device_agent_status_done">Agent finished</string>
+    <string name="device_agent_status_stuck">Agent stuck — stopped</string>
+    <string name="device_agent_status_error">Agent error</string>
+    <string name="device_agent_status_idle">Agent idle</string>
 </resources>

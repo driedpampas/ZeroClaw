@@ -51,6 +51,28 @@
         </service>
 
         <service
+            android:name=".service.device.DeviceAgentService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="On-device AI agent performing screen tasks" />
+        </service>
+
+        <service
+            android:name=".service.device.ZeroClawAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <service
             android:name=".service.DaemonTileService"
             android:exported="true"
             android:icon="@drawable/ic_notification"
